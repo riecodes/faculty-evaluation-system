@@ -1,0 +1,168 @@
+.toast{
+  display: none;
+  min-width: 20vw
+}
+.toast.show {
+    display: block;
+    opacity: 1;
+    position: fixed;
+    z-index: 99999999;
+    margin: 20px;
+    right: 0;
+    top: 3.5rem;
+}
+.swal2-container{
+    z-index: 99999999;
+}
+#preloader2 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  overflow: hidden;
+  background: #ffffff82;
+}
+
+#preloader2:before {
+  content: "";
+  position: fixed;
+  top: calc(50% - 30px);
+  left: calc(50% - 30px);
+  border: 6px solid #1977cc;
+  border-top-color: #d1e6f9;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  -webkit-animation: animate-preloader 1s linear infinite;
+  animation: animate-preloader 1s linear infinite;
+}
+@-webkit-keyframes animate-preloader {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes animate-preloader {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    font-size: smaller;
+    color: #000000cf;
+    font-style: italic;
+}
+ .modal-dialog.large {
+    width: 80% !important;
+    max-width: unset;
+  }
+  .modal-dialog.mid-large {
+    width: 50% !important;
+    max-width: unset;
+  }
+  #viewer_modal .btn-close {
+    position: absolute;
+    z-index: 999999;
+    /*right: -4.5em;*/
+    background: unset;
+    color: white;
+    border: unset;
+    font-size: 27px;
+    top: 0;
+}
+#viewer_modal .modal-dialog {
+        width: 80%;
+    max-width: unset;
+    height: calc(90%);
+    max-height: unset;
+}
+  #viewer_modal .modal-content {
+       background: black;
+    border: unset;
+    height: calc(100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #viewer_modal img,#viewer_modal video{
+    max-height: calc(100%);
+    max-width: calc(100%);
+  }
+
+/* Color overrides to replace #183f74 with #183f74 */
+.bg-info.btn:hover,
+.bg-cyan.btn:hover {
+  border-color: #183f74 !important;
+}
+
+.bg-info.btn:not(:disabled):not(.disabled):active, 
+.bg-info.btn:not(:disabled):not(.disabled).active, 
+.bg-info.btn:active, 
+.bg-info.btn.active,
+.bg-cyan.btn:not(:disabled):not(.disabled):active, 
+.bg-cyan.btn:not(:disabled):not(.disabled).active, 
+.bg-cyan.btn:active, 
+.bg-cyan.btn.active {
+  background-color: #183f74 !important;
+  border-color: #183f74 !important;
+}
+
+.btn-info:hover, 
+.btn-info:focus, 
+.btn-info.focus {
+  background-color: #183f74 !important;
+  border-color: #183f74 !important;
+}
+
+.btn-info:not(:disabled):not(.disabled):active, 
+.btn-info:not(:disabled):not(.disabled).active,
+.show > .btn-info.dropdown-toggle {
+  background-color: #183f74 !important;
+  border-color: #183f74 !important;
+}
+
+a.badge-info:hover, 
+a.badge-info:focus {
+  background-color: #183f74 !important;
+}
+
+a.bg-info:hover, 
+a.bg-info:focus,
+button.bg-info:hover,
+button.bg-info:focus {
+  background-color: #183f74 !important;
+}
+
+.callout.callout-info {
+  border-left-color: #183f74 !important;
+}
+
+.bg-gradient-info.btn:hover,
+.bg-gradient-cyan.btn:hover {
+  border-color: #183f74 !important;
+}
+
+.bg-gradient-info.btn:not(:disabled):not(.disabled):active,
+.bg-gradient-info.btn:not(:disabled):not(.disabled).active,
+.bg-gradient-info.btn:active,
+.bg-gradient-info.btn.active,
+.bg-gradient-cyan.btn:not(:disabled):not(.disabled):active,
+.bg-gradient-cyan.btn:not(:disabled):not(.disabled).active,
+.bg-gradient-cyan.btn:active,
+.bg-gradient-cyan.btn.active {
+  background: #183f74 linear-gradient(180deg, #3a5c89, #183f74) repeat-x !important;
+  border-color: #183f74 !important;
+}
