@@ -2,7 +2,8 @@
 ?>
 <div class="col-lg-12">
 	<div class="card">
-		<div class="card-body">
+		<div class="card-body">			
+			<button class="btn btn-primary btn-sm mb-2" type="button" data-toggle="modal" data-target="#bulkFacultyModal"><i class="fa fa-upload"></i> Bulk Account Creation</button>
 			<form action="" id="manage_faculty">
 				<input type="hidden" name="id" value="<?php echo isset($id) ? $id : '' ?>">
 				<div class="row">
@@ -136,4 +137,69 @@
 			}
 		})
 	})
+
+	$('#bulkFacultyForm').submit(function(e){
+		e.preventDefault();
+		start_load();
+		$.ajax({
+			url: 'ajax.php?action=import_faculty_csv',
+			data: new FormData($(this)[0]),
+			cache: false,
+			contentType: false,
+			processData: false,
+			method: 'POST',
+			type: 'POST',
+			success: function(resp){
+				resp = JSON.parse(resp);
+				if(resp.status == 'success'){
+					alert_toast(resp.message, 'success');
+					if(resp.errors.length > 0){
+						var errorMsg = '<ul>';
+						resp.errors.forEach(function(error){
+							errorMsg += '<li>' + error + '</li>';
+						});
+						errorMsg += '</ul>';
+						$('#bulkFacultyModal .modal-body').prepend('<div class="alert alert-warning">' + errorMsg + '</div>');
+					}
+					setTimeout(function(){
+						location.reload();
+					}, 1500);
+				} else {
+					alert_toast(resp.message, 'error');
+					end_load();
+				}
+			},
+			error: function(err){
+				console.log(err);
+				alert_toast('An error occurred', 'error');
+				end_load();
+			}
+		});
+	});
 </script>
+<!-- Bulk Faculty Modal -->
+<div class="modal fade" id="bulkFacultyModal" tabindex="-1" role="dialog" aria-labelledby="bulkFacultyModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bulkFacultyModalLabel">Bulk Faculty Account Creation</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="bulkFacultyForm" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="facultyCSV">Upload CSV File</label>
+            <input type="file" class="form-control-file" id="facultyCSV" name="facultyCSV" accept=".csv" required>
+          </div>
+          <a href="templates/sample_faculty_import.csv" download>Download Sample CSV Template</a>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="submit" form="bulkFacultyForm" class="btn btn-primary">Upload</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -186,5 +186,16 @@ if ($action == 'get_report') {
     if ($get)
         echo $get;
 }
+
+if ($action == 'import_students_csv') {
+    $result = $crud->import_students_csv($_FILES['studentCSV']);
+    echo json_encode($result);
+}
+
+if ($action == 'import_faculty_csv') {
+    $result = $crud->import_faculty_csv($_FILES['facultyCSV']);
+    echo json_encode($result);
+}
+
 ob_end_flush();
 ?>

@@ -773,4 +773,171 @@ class Action
         if($update)
             return 1;
     }
+
+    function import_students_csv($file) {
+        if (($handle = fopen($file['tmp_name'], "r")) !== FALSE) {
+            $header = fgetcsv($handle); // Get header row
+            $required_fields = ['school_id', 'firstname', 'lastname', 'class_id', 'email', 'password', 'status'];
+            
+            // Validate header
+            if (count(array_diff($required_fields, $header)) > 0) {
+                return ['status' => 'error', 'message' => 'Invalid CSV format. Please use the sample template.'];
+            }
+
+            $success = 0;
+            $failed = 0;
+            $errors = [];
+
+            while (($data = fgetcsv($handle)) !== FALSE) {
+                $row = array_combine($header, $data);
+                
+                // Validate required fields
+                if (empty($row['school_id']) || empty($row['firstname']) || empty($row['lastname']) || 
+                    empty($row['email']) || empty($row['password'])) {
+                    $failed++;
+                    $row_num = $failed;
+                    $errors[] = "Row " . $row_num . ": Missing required fields";
+                    continue;
+                }
+
+                // Check for duplicate email
+                $check = $this->db->query("SELECT * FROM student_list where email = '{$row['email']}'")->num_rows;
+                if ($check > 0) {
+                    $failed++;
+                    $row_num = $failed;
+                    $errors[] = "Row " . $row_num . ": Email {$row['email']} already exists";
+                    continue;
+                }
+
+                // Check for duplicate school_id
+                $check = $this->db->query("SELECT * FROM student_list where school_id = '{$row['school_id']}'")->num_rows;
+                if ($check > 0) {
+                    $failed++;
+                    $row_num = $failed;
+                    $errors[] = "Row " . $row_num . ": School ID {$row['school_id']} already exists";
+                    continue;
+                }
+
+                // Prepare data for insertion
+                $data = " school_id = '{$row['school_id']}' ";
+                $data .= ", firstname = '{$row['firstname']}' ";
+                $data .= ", lastname = '{$row['lastname']}' ";
+                $data .= ", class_id = '{$row['class_id']}' ";
+                $data .= ", email = '{$row['email']}' ";
+                $data .= ", password = '" . md5($row['password']) . "' ";
+                $data .= ", status = '" . ($row['status'] ?? 1) . "' ";
+
+                $save = $this->db->query("INSERT INTO student_list set $data");
+                if ($save) {
+                    $success++;
+                } else {
+                    $failed++;
+                    $row_num = $failed;
+                    $errors[] = "Row " . $row_num . ": Database error";
+                }
+            }
+            fclose($handle);
+            
+            return [
+                'status' => 'success',
+                'message' => "Import completed. Successfully imported {$success} records. Failed: {$failed}",
+                'errors' => $errors
+            ];
+        }
+        return ['status' => 'error', 'message' => 'Failed to open CSV file'];
+    }
+
+    function import_faculty_csv($file) {
+        if (($handle = fopen($file['tmp_name'], "r")) !== FALSE) {
+            $header = fgetcsv($handle); // Get header row
+            $required_fields = ['school_id', 'firstname', 'lastname', 'email', 'password', 'status'];
+            
+            // Validate header
+            if (count(array_diff($required_fields, $header)) > 0) {
+                return ['status' => 'error', 'message' => 'Invalid CSV format. Please use the sample template.'];
+            }
+
+            $success = 0;
+            $failed = 0;
+            $errors = [];
+
+            while (($data = fgetcsv($handle)) !== FALSE) {
+                $row = array_combine($header, $data);
+                
+                // Validate required fields
+                if (empty($row['school_id']) || empty($row['firstname']) || empty($row['lastname']) || 
+                    empty($row['email']) || empty($row['password'])) {
+                    $failed++;
+                    $row_num = $failed;
+                    $errors[] = "Row " . $row_num . ": Missing required fields";
+                    continue;
+                }
+
+                // Check for duplicate email
+                $check = $this->db->query("SELECT * FROM faculty_list where email = '{$row['email']}'")->num_rows;
+                if ($check > 0) {
+                    $failed++;
+                    $row_num = $failed;
+                    $errors[] = "Row " . $row_num . ": Email {$row['email']} already exists";
+                    continue;
+                }
+
+                // Check for duplicate school_id
+                $check = $this->db->query("SELECT * FROM faculty_list where school_id = '{$row['school_id']}'")->num_rows;
+                if ($check > 0) {
+                    $failed++;
+                    $row_num = $failed;
+                    $errors[] = "Row " . $row_num . ": School ID {$row['school_id']} already exists";
+                    continue;
+                }
+
+                // Prepare data for insertion
+                $data = " school_id = '{$row['school_id']}' ";
+                $data .= ", firstname = '{$row['firstname']}' ";
+                $data .= ", lastname = '{$row['lastname']}' ";
+                $data .= ", email = '{$row['email']}' ";
+                $data .= ", password = '" . md5($row['password']) . "' ";
+                $data .= ", status = '" . ($row['status'] ?? 1) . "' ";
+
+                $save = $this->db->query("INSERT INTO faculty_list set $data");
+                if ($save) {
+                    $success++;
+                } else {
+                    $failed++;
+                    $row_num = $failed;
+                    $errors[] = "Row " . $row_num . ": Database error";
+                }
+            }
+            fclose($handle);
+            
+            return [
+                'status' => 'success',
+                'message' => "Import completed. Successfully imported {$success} records. Failed: {$failed}",
+                'errors' => $errors
+            ];
+        }
+        return ['status' => 'error', 'message' => 'Failed to open CSV file'];
+    }
+
+    function save_criteria_question() {
+        extract($_POST);
+        $data = "";
+        foreach ($_POST as $k => $v) {
+            if (!in_array($k, array('id')) && !is_numeric($k)) {
+                if (empty($data)) {
+                    $data .= " $k='$v' ";
+                } else {
+                    $data .= ", $k='$v' ";
+                }
+            }
+        }
+        if (empty($id)) {
+            $save = $this->db->query("INSERT INTO criteria_questions set $data");
+        } else {
+            $save = $this->db->query("UPDATE criteria_questions set $data where id = $id");
+        }
+        if ($save) {
+            return 1;
+        }
+    }
 }
