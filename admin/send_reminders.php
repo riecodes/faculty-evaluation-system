@@ -13,6 +13,9 @@ if(!isset($_SESSION['login_id']) || $_SESSION['login_type'] != 1) {
     exit;
 }
 
+// Load mail configuration
+$mail_config = require_once '../config/mail_config.php';
+
 $academic_id = $_SESSION['academic']['id'];
 $success = true;
 $sent_count = 0;
@@ -47,15 +50,15 @@ while($student = $pending_query->fetch_assoc()) {
         try {
             // Server settings
             $mail->isSMTP();
-            $mail->Host = 'smtp.gmail.com';
+            $mail->Host = $mail_config['host'];
             $mail->SMTPAuth = true;
-            $mail->Username = 'bronzetoconqueror03@gmail.com';
-            $mail->Password = 'aebb pzeu reec dtza';
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-            $mail->Port = 465;
+            $mail->Username = $mail_config['username'];
+            $mail->Password = $mail_config['password'];
+            $mail->SMTPSecure = $mail_config['encryption'];
+            $mail->Port = $mail_config['port'];
 
             // Recipients
-            $mail->setFrom('bronzetoconqueror03@gmail.com', 'Faculty Evaluation System');
+            $mail->setFrom($mail_config['from_email'], $mail_config['from_name']);
             $mail->addAddress($student['email'], $student['student_name']);
 
             // Content

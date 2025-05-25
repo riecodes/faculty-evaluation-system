@@ -1,0 +1,9 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Ignore mail configuration
+config/mail_config.php
+
+# ... existing code ... 

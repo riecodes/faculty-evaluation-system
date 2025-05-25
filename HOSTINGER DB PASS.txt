@@ -1,5 +1,0 @@
-Websites - coral-grasshopper-385033.hostingersite.com - Databases - Management
-
-MySQL database name: u420864400_evaluation_db
-MySQL Username:      u420864400_admin
-Password:            e?6KL2?9R

@@ -145,6 +145,26 @@ if ($action == 'delete_student') {
     if ($save)
         echo $save;
 }
+if ($action == 'deactivate_faculty') {
+    $save = $crud->deactivate_faculty();
+    if ($save)
+        echo $save;
+}
+if ($action == 'activate_faculty') {
+    $save = $crud->activate_faculty();
+    if ($save)
+        echo $save;
+}
+if ($action == 'deactivate_student') {
+    $save = $crud->deactivate_student();
+    if ($save)
+        echo $save;
+}
+if ($action == 'activate_student') {
+    $save = $crud->activate_student();
+    if ($save)
+        echo $save;
+}
 if ($action == 'save_restriction') {
     $save = $crud->save_restriction();
     if ($save)

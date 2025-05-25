@@ -189,6 +189,9 @@ if (isset($_SESSION['login_id']))
                     success: function (resp) {
                         if (resp == 1) {
                             location.href = 'index.php?page=home';
+                        } else if (resp == 3) {
+                            $('#login-form').prepend('<div class="alert alert-danger">This account has been deactivated. Please contact the administrator.</div>')
+                            end_load();
                         } else {
                             $('#login-form').prepend('<div class="alert alert-danger">Username or password is incorrect.</div>')
                             end_load();

@@ -83,13 +83,6 @@ function ordinal_suffix($num)
 			url.searchParams.delete('status');
 			url.searchParams.delete('message');
 			window.history.replaceState({}, '', url);
-			
-			// Auto dismiss the alert after 5 seconds
-			setTimeout(function() {
-				$('#status-alert').fadeOut('slow', function() {
-					$(this).remove();
-				});
-			}, 5000);
 		});
 	</script>
 	<?php endif; ?>
@@ -97,7 +90,7 @@ function ordinal_suffix($num)
 	<div class="card shadow-sm border mb-4">
 		<div class="shadow-sm container-fluid px-4 p-3 mb-4 bg-primary text-white d-flex justify-content-between align-items-center">
 			<h5 class="card-title mb-0">Pending Evaluations</h5>
-			<a href="admin/send_reminders.php" class="btn btn-primary border-white" onclick="return confirm('Are you sure you want to send evaluation reminders to all pending students?')">
+			<a href="admin/send_reminders.php" class="btn btn-primary border-white">
 				<i class="fas fa-envelope"></i> Send Reminders
 			</a>
 		</div>
@@ -350,6 +343,35 @@ function ordinal_suffix($num)
 		})
 		if ($('#faculty_id').val() > 0)
 			load_class()
+
+		// Add loading overlay when sending reminders
+		$('a[href="admin/send_reminders.php"]').click(function(e) {
+			e.preventDefault();
+			var href = $(this).attr('href');
+			
+			// Show loading overlay
+			$('body').append('<div id="loading-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; justify-content: center; align-items: center;"><div style="background: white; padding: 20px; border-radius: 5px; text-align: center;"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Sending reminders, please wait...</div></div>');
+			
+			// Disable all clickable elements
+			$('a, button').css('pointer-events', 'none');
+			
+			// Remove the beforeunload handler before navigation
+			$(window).off('beforeunload');
+			
+			// Navigate to send_reminders.php
+			window.location.href = href;
+		});
+
+		// Handle navigation warning only when loading overlay is not present
+		$(window).on('beforeunload', function(e) {
+			if($('#loading-overlay').length > 0) {
+				return;
+			}
+			// Only show warning if there are unsaved changes
+			if($('form').length > 0 && $('form').serialize() !== $('form').data('original-state')) {
+				return "Changes you made may not be saved.";
+			}
+		});
 	})
 	function load_class() {
 		start_load()

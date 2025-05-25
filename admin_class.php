@@ -23,7 +23,16 @@ class Action
         extract($_POST);
         $type = array("", "users", "faculty_list", "student_list");
         $type2 = array("", "admin", "faculty", "student");
-        $qry = $this->db->query("SELECT *,concat(firstname,' ',lastname) as name FROM {$type[$login]} where email = '" . $email . "' and password = '" . md5($password) . "'  ");
+        
+        // Add status check for faculty and student
+        $status_check = "";
+        if($login == 2) { // Faculty
+            $status_check = " and status = 1";
+        } else if($login == 3) { // Student
+            $status_check = " and status = 1";
+        }
+        
+        $qry = $this->db->query("SELECT *,concat(firstname,' ',lastname) as name FROM {$type[$login]} where email = '" . $email . "' and password = '" . md5($password) . "'" . $status_check);
         if ($qry->num_rows > 0) {
             foreach ($qry->fetch_array() as $key => $value) {
                 if ($key != 'password' && !is_numeric($key))
@@ -40,7 +49,12 @@ class Action
             }
             return 1;
         } else {
-            return 2;
+            // Check if account exists but is deactivated
+            $check_deactivated = $this->db->query("SELECT * FROM {$type[$login]} where email = '" . $email . "' and password = '" . md5($password) . "' and status = 0");
+            if($check_deactivated->num_rows > 0) {
+                return 3; // Account deactivated
+            }
+            return 2; // Invalid credentials
         }
     }
     function logout()
@@ -727,5 +741,36 @@ class Action
 
         return json_encode($data);
 
+    }
+    function deactivate_faculty()
+    {
+        extract($_POST);
+        $update = $this->db->query("UPDATE faculty_list set status = 0 where id = $id");
+        if($update)
+            return 1;
+    }
+
+    function activate_faculty()
+    {
+        extract($_POST);
+        $update = $this->db->query("UPDATE faculty_list set status = 1 where id = $id");
+        if($update)
+            return 1;
+    }
+
+    function deactivate_student()
+    {
+        extract($_POST);
+        $update = $this->db->query("UPDATE student_list set status = 0 where id = $id");
+        if($update)
+            return 1;
+    }
+
+    function activate_student()
+    {
+        extract($_POST);
+        $update = $this->db->query("UPDATE student_list set status = 1 where id = $id");
+        if($update)
+            return 1;
     }
 }
