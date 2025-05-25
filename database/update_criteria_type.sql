@@ -1,0 +1,1 @@
+ALTER TABLE criteria_list ADD COLUMN type ENUM('checklist', 'textfield') NOT NULL DEFAULT 'checklist'; 

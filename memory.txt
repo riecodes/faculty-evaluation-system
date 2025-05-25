@@ -4,12 +4,75 @@
 1. [x] Add necessary columns to tables (e.g., status column for faculty_list and student_list)
 2. [x] Create SQL update script for database changes
 3. [x] Document default values and constraints
+4. [x] Added type column to criteria_list table:
+   ```sql
+   ALTER TABLE criteria_list ADD COLUMN type ENUM('checklist', 'textfield') NOT NULL DEFAULT 'checklist';
+   ```
+5. [x] Added type column to question_list table:
+   ```sql
+   ALTER TABLE question_list ADD COLUMN type ENUM('checklist', 'textfield') NOT NULL DEFAULT 'checklist';
+   ```
+6. [x] Added comment column to evaluation_answers table:
+   ```sql
+   ALTER TABLE evaluation_answers ADD COLUMN comment TEXT DEFAULT NULL AFTER rate;
+   ```
+   - Purpose: Store textfield responses
+   - Type: TEXT to allow long comments
+   - Default: NULL since it's only used for textfield questions
+   - Position: After rate column for logical organization
+7. [x] Added 'type' column to student_list table
+   - ENUM('regular', 'irregular')
+   - Default value: 'regular'
+   - Position: After class_id
+
+## Design Decisions
+1. [x] Criteria Type Immutability
+   - Type can only be set during criteria creation
+   - Type field is hidden during edit operations
+   - Backend prevents type changes during updates
+   - Rationale:
+     * Maintains data consistency
+     * Prevents issues with existing questions
+     * Avoids confusion in evaluation format
+     * Preserves historical data integrity
+
+2. [x] Question Type Inheritance
+   - Questions inherit type from parent criteria
+   - Type field is hidden in question form
+   - Type is automatically set based on selected criteria
+   - Rationale:
+     * Maintains parent-child relationship
+     * Ensures data consistency
+     * Simplifies user interface
+     * Prevents type mismatches
+     * Aligns with criteria type immutability
+
+3. [x] Evaluation Form Type Handling
+   - Questions display differently based on type:
+     * Checklist: Shows 5-1 rating radio buttons
+     * Textfield: Shows textarea for comments
+   - Backend stores responses differently:
+     * Checklist: Stores rating in 'rate' field
+     * Textfield: Stores comment in 'comment' field, rate=0
+   - Rationale:
+     * Maintains consistent user experience
+     * Preserves data structure
+     * Allows for different response types
+     * Supports both quantitative and qualitative feedback
 
 ## Backend Implementation
 1. [x] Add new functions in admin_class.php
    - Example: deactivate_faculty(), activate_faculty(), etc.
    - Include proper error handling
    - Return appropriate response codes
+2. [x] Updated save_question() in admin_class.php:
+   - Added type field handling
+   - Maintains order_by functionality
+   - Returns 1 on successful save
+3. [x] Updated save_criteria() in admin_class.php:
+   - Added type field handling
+   - Maintains order_by functionality
+   - Returns 1 on successful save
 
 2. [x] Add AJAX handlers in ajax.php
    - Add new action cases
@@ -21,13 +84,33 @@
    - Add status column in tables
    - Add deactivate/activate buttons in dropdown
    - Add visual indicators (badges) for status
+2. [x] Criteria List (criteria_list.php):
+   - Added type selection dropdown
+   - Options: "5-1 Rating Checklist" and "Textfield Comment"
+   - Default value: "checklist"
+3. [x] Question Management (manage_questionnaire.php):
+   - Added type selection dropdown
+   - Dynamic type update based on selected criteria
+   - Conditional display of rating options or textfield
+   - Updated edit functionality to handle type field
 
-2. [x] Implement JavaScript functions
-   - Add click handlers for new buttons
-   - Implement AJAX calls
-   - Handle loading states (start_load/end_load)
-   - Show success/error messages
-   - Handle page reload after actions
+## JavaScript Functions
+1. [x] Question Type Handling:
+   ```javascript
+   $('#criteria_id').change(function() {
+       var selectedOption = $(this).find('option:selected');
+       var criteriaType = selectedOption.data('type');
+       $('#question_type').val(criteriaType);
+   });
+   ```
+2. [x] Question Display:
+   ```php
+   <?php if($row['type'] == 'checklist'): ?>
+       <!-- Display 5-1 rating radio buttons -->
+   <?php else: ?>
+       <!-- Display textfield -->
+   <?php endif; ?>
+   ```
 
 ## Authentication & Security
 1. [x] Update login function to check account status
@@ -39,23 +122,33 @@
    - Verify column additions
    - Check default values
    - Test constraints
-
 2. [x] Test backend functions
    - Verify function responses
    - Check error handling
    - Test edge cases
-
 3. [x] Test frontend functionality
    - Test button clicks
    - Verify loading states
    - Check success/error messages
    - Test page reloads
    - Verify status updates
-
 4. [x] Test authentication
    - Verify deactivated accounts can't login
    - Check proper error messages
    - Test reactivation process
+5. [x] Database Changes:
+   - [ ] Verify type columns exist in both tables
+   - [ ] Confirm default values are set correctly
+   - [ ] Test ENUM constraints
+6. [x] Backend Functions:
+   - [ ] Test saving criteria with different types
+   - [ ] Test saving questions with different types
+   - [ ] Verify order_by functionality still works
+7. [x] Frontend Functionality:
+   - [ ] Test type selection in criteria form
+   - [ ] Test type selection in question form
+   - [ ] Verify type updates when criteria changes
+   - [ ] Test display of both checklist and textfield types
 
 ## Common Issues & Solutions
 1. Infinite Loading
@@ -63,18 +156,31 @@
    - Verify JavaScript error handling
    - Ensure proper end_load() calls
    - Check console for errors
-
 2. Database Updates Not Working
    - Verify SQL syntax
    - Check table structure
    - Verify column names
    - Test queries directly
-
 3. UI Not Updating
    - Check JavaScript event handlers
    - Verify AJAX responses
    - Check page reload timing
    - Verify DOM updates
+4. Type Not Updating:
+   - Check criteria_id change event handler
+   - Verify data-type attribute is set correctly
+   - Check database column values
+5. Display Issues:
+   - Verify conditional display logic
+   - Check CSS for textfield styling
+   - Ensure proper form validation
+6. Evaluation Submission Issues:
+   - Check question type in database
+   - Verify form data structure
+   - Check AJAX response handling
+   - Verify database column values
+   - Check SQL escaping for textfield comments
+   - Note: rate column cannot be NULL, use 0 for textfield responses
 
 ## Best Practices
 1. Always implement both frontend and backend changes
@@ -85,6 +191,13 @@
 6. Keep code consistent with existing patterns
 7. Use proper security measures
 8. Maintain data integrity
+9. Always validate type values before saving
+10. Maintain consistent naming conventions
+11. Database Integrity:
+    - Use foreign key constraints
+    - Implement cascade delete where appropriate
+    - Regular cleanup of orphaned records
+    - Maintain referential integrity
 
 ## Future Improvements
 1. Add audit logging for status changes
@@ -94,4 +207,255 @@
 5. Add status filters in lists
 6. Implement status change confirmation
 7. Add status change permissions
-8. Create status change reports 
+8. Create status change reports
+9. Add validation for textfield responses
+10. Implement character limits if needed
+11. Add rich text editor for textfield responses
+12. Add export functionality for textfield responses
+
+## Evaluation Submission Changes
+1. [x] Updated save_evaluation() in admin_class.php:
+   - Added question type detection
+   - Proper handling of both checklist and textfield responses
+   - Checklist responses stored in 'rate' column
+   - Textfield responses stored in 'comment' column with rate=0
+   - Added proper SQL escaping for textfield comments
+   - Returns 1 on successful save
+
+2. [x] Updated get_report() in admin_class.php:
+   - Added question type detection in SQL query
+   - Separate handling for checklist and textfield responses
+   - Checklist responses calculated as percentages
+   - Textfield responses stored as array of comments
+   - Returns both ratings and comments in JSON response
+
+3. [x] Updated AJAX handler in ajax.php:
+   - Improved error handling for save_evaluation
+   - Added better error reporting
+   - Returns clear success/error messages
+
+4. [x] Updated evaluate.php JavaScript:
+   - Added form validation for required textfields
+   - Improved error handling in AJAX submission
+   - Added proper loading state management
+   - Added better user feedback messages
+
+## Database Structure
+1. [x] evaluation_answers table:
+   ```sql
+   CREATE TABLE `evaluation_answers` (
+     `evaluation_id` int(30) NOT NULL,
+     `question_id` int(30) NOT NULL,
+     `rate` int(20) NOT NULL DEFAULT 0,
+     `comment` text DEFAULT NULL
+   )
+   ```
+   - rate: 0 for textfield responses (not NULL)
+   - comment: NULL for checklist responses
+   - Both fields can be NULL but not simultaneously 
+
+## Database Integrity
+1. [x] Added Cascade Delete Constraints:
+   ```sql
+   -- Clean up orphaned questions
+   DELETE FROM question_list 
+   WHERE criteria_id NOT IN (SELECT id FROM criteria_list);
+
+   -- Add foreign key constraints with cascade delete
+   ALTER TABLE question_list
+   ADD CONSTRAINT fk_question_criteria
+   FOREIGN KEY (criteria_id) 
+   REFERENCES criteria_list(id)
+   ON DELETE CASCADE;
+
+   ALTER TABLE evaluation_answers
+   ADD CONSTRAINT fk_answer_question
+   FOREIGN KEY (question_id) 
+   REFERENCES question_list(id)
+   ON DELETE CASCADE;
+   ```
+   - Ensures data integrity when deleting criteria
+   - Automatically deletes related questions
+   - Automatically deletes related evaluation answers
+   - Prevents orphaned records 
+
+## Bulk Import Improvements
+1. [x] Enhanced Faculty Import:
+   - Added proper file validation
+   - Added SQL injection protection using real_escape_string()
+   - Added password hashing using md5()
+   - Added better error handling and reporting
+   - Added validation for required fields
+   - Added duplicate email and school_id checks
+   - Added proper status handling
+
+2. [x] Enhanced Student Import:
+   - Added proper file validation
+   - Added SQL injection protection using real_escape_string()
+   - Added password hashing using md5()
+   - Added better error handling and reporting
+   - Added validation for required fields including class_id
+   - Added duplicate email and school_id checks
+   - Added class_id existence validation
+   - Added proper status handling
+
+3. [x] Common Features for Both:
+   - Proper file upload handling
+   - CSV format validation
+   - Required field validation
+   - Duplicate checking
+   - Error reporting
+   - Success/failure tracking
+   - Status updates
+   - Security improvements
+
+4. [x] Security Improvements:
+   - SQL injection protection
+   - Input validation
+   - Password hashing
+   - File validation
+   - Error handling
+   - Status tracking
+
+5. [x] UI Improvements:
+   - Better error messages
+   - Progress indicators
+   - Success notifications
+   - File validation feedback
+   - Download template option
+
+## CSV Import Format
+1. Faculty CSV Format:
+   ```csv
+   school_id,firstname,lastname,email,password,status
+   F2023001,John,Doe,john.doe@example.com,password123,1
+   ```
+
+2. Student CSV Format:
+   ```csv
+   school_id,firstname,lastname,email,password,class_id,status
+   S2023001,Jane,Smith,jane.smith@example.com,password123,1,1
+   ```
+
+## Import Process
+1. File Upload:
+   - Validate file exists
+   - Check file format
+   - Verify required fields
+   - Process each row
+
+2. Data Validation:
+   - Check required fields
+   - Validate email format
+   - Check for duplicates
+   - Verify class_id exists (for students)
+   - Validate status values
+
+3. Data Processing:
+   - Hash passwords
+   - Escape special characters
+   - Convert status to integer
+   - Insert into database
+
+4. Error Handling:
+   - Track success/failure
+   - Report specific errors
+   - Show progress
+   - Provide feedback
+
+## Best Practices
+1. Always validate input data
+2. Use proper SQL escaping
+3. Hash passwords consistently
+4. Check for duplicates
+5. Validate foreign keys
+6. Provide clear error messages
+7. Track import progress
+8. Handle errors gracefully
+9. Maintain data integrity
+10. Follow security guidelines
+
+Irregular Student Feature Implementation (Updated)
+===============================================
+
+Database Changes:
+----------------
+1. Added 'type' column to student_list table
+   - ENUM('regular', 'irregular')
+   - Default value: 'regular'
+   - Position: After class_id
+
+2. Added 'type' column to restriction_list table
+   - ENUM('regular', 'irregular')
+   - Default value: 'regular'
+   - Position: After subject_id
+   - Added index for performance
+
+Implementation Notes:
+-------------------
+1. Irregular Student Evaluation Process:
+   - Student selects faculty, subject, and section from dropdowns
+   - System validates:
+     * Subject not previously evaluated
+     * Valid faculty-subject combination
+     * Valid section selection
+   - Creates irregular restriction entry
+   - Stores evaluation in standard tables
+
+2. Evaluation Flow:
+   - Irregular student logs in
+   - Selects faculty from dropdown
+   - Selects subject from filtered dropdown
+   - Selects section from filtered dropdown
+   - System validates combination
+   - Proceeds with evaluation
+
+3. Report Integration:
+   - Regular and irregular evaluations shown together
+   - Total evaluations include both types
+   - Maintains data consistency
+   - Uses section selection as class_id for proper display
+
+4. UI Updates:
+   - Add irregular badge to student list
+   - Add type dropdown in student edit form
+   - Modify evaluation form for irregular students
+   - Add section selection dropdown
+
+5. Validation Rules:
+   - One evaluation per subject
+   - Valid faculty-subject combinations
+   - Valid section selections
+   - Proper type tracking
+
+6. Security Measures:
+   - Validate student type
+   - Track evaluation history
+   - Prevent duplicate evaluations
+   - Maintain data integrity
+
+Required Changes:
+---------------
+1. Database:
+   - Add type columns
+   - Add necessary indexes
+   - Update existing records
+
+2. Backend:
+   - Add irregular validation
+   - Modify evaluation process
+   - Update report generation
+   - Add type checking
+
+3. Frontend:
+   - Add type indicators
+   - Modify forms
+   - Add dropdowns
+   - Update displays
+
+4. Reports:
+   - Update total calculations
+   - Add type filtering
+   - Maintain consistency
+   - Display evaluations without section grouping
+   

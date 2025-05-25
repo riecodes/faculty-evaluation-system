@@ -16,6 +16,7 @@
 						<th>Email</th>
 						<th>Current Class</th>
 						<th>Status</th>
+						<th>Type</th>
 						<th>Action</th>
 					</tr>
 				</thead>
@@ -44,6 +45,13 @@
 							<?php endif; ?>
 						</td>
 						<td class="text-center">
+							<?php if($row['type'] == 'irregular'): ?>
+								<span class="badge badge-warning">Irregular</span>
+							<?php else: ?>
+								<span class="badge badge-info">Regular</span>
+							<?php endif; ?>
+						</td>
+						<td class="text-center">
 							<button type="button" class="btn btn-default btn-sm border-info wave-effect text-info dropdown-toggle" data-toggle="dropdown" aria-expanded="true">
 		                      Action
 		                    </button>
@@ -56,6 +64,12 @@
 		                      <a class="dropdown-item deactivate_student" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>">Deactivate</a>
 		                      <?php else: ?>
 		                      <a class="dropdown-item activate_student" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>">Activate</a>
+		                      <?php endif; ?>
+		                      <div class="dropdown-divider"></div>
+		                      <?php if($row['type'] == 'regular'): ?>
+		                      <a class="dropdown-item mark_irregular" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>">Mark as Irregular</a>
+		                      <?php else: ?>
+		                      <a class="dropdown-item mark_regular" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>">Mark as Regular</a>
 		                      <?php endif; ?>
 		                      <div class="dropdown-divider"></div>
 		                      <a class="dropdown-item delete_student" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>">Delete</a>
@@ -81,6 +95,12 @@
 	})
 	$('.activate_student').click(function(){
 	_conf("Are you sure to activate this student?","activate_student",[$(this).attr('data-id')])
+	})
+	$('.mark_irregular').click(function(){
+	_conf("Are you sure to mark this student as irregular?","mark_irregular",[$(this).attr('data-id')])
+	})
+	$('.mark_regular').click(function(){
+	_conf("Are you sure to mark this student as regular?","mark_regular",[$(this).attr('data-id')])
 	})
 		$('#list').dataTable()
 	})
@@ -144,6 +164,38 @@
 				} else {
 					alert_toast("An error occurred",'error')
 					end_load()
+				}
+			}
+		})
+	}
+	function mark_irregular($id){
+		start_load()
+		$.ajax({
+			url:'ajax.php?action=mark_irregular',
+			method:'POST',
+			data:{id:$id},
+			success:function(resp){
+				if(resp==1){
+					alert_toast("Student successfully marked as irregular",'success')
+					setTimeout(function(){
+						location.reload()
+					},1500)
+				}
+			}
+		})
+	}
+	function mark_regular($id){
+		start_load()
+		$.ajax({
+			url:'ajax.php?action=mark_regular',
+			method:'POST',
+			data:{id:$id},
+			success:function(resp){
+				if(resp==1){
+					alert_toast("Student successfully marked as regular",'success')
+					setTimeout(function(){
+						location.reload()
+					},1500)
 				}
 			}
 		})

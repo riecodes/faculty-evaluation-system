@@ -138,42 +138,60 @@
 		})
 	})
 
-	$('#bulkFacultyForm').submit(function(e){
-		e.preventDefault();
-		start_load();
-		$.ajax({
-			url: 'ajax.php?action=import_faculty_csv',
-			data: new FormData($(this)[0]),
-			cache: false,
-			contentType: false,
-			processData: false,
-			method: 'POST',
-			type: 'POST',
-			success: function(resp){
-				resp = JSON.parse(resp);
-				if(resp.status == 'success'){
-					alert_toast(resp.message, 'success');
-					if(resp.errors.length > 0){
-						var errorMsg = '<ul>';
-						resp.errors.forEach(function(error){
-							errorMsg += '<li>' + error + '</li>';
-						});
-						errorMsg += '</ul>';
-						$('#bulkFacultyModal .modal-body').prepend('<div class="alert alert-warning">' + errorMsg + '</div>');
+	$(document).ready(function() {
+		$('#uploadFacultyBtn').click(function(e) {
+			e.preventDefault();
+			console.log('Upload button clicked');
+			
+			var formData = new FormData($('#bulkFacultyForm')[0]);
+			var file = formData.get('facultyCSV');
+			
+			if(!file || file.size === 0) {
+				$('#import-message').html('<div class="alert alert-danger">Please select a CSV file to upload.</div>');
+				return;
+			}
+			
+			console.log('File selected:', file.name);
+			start_load();
+			
+			$.ajax({
+				url: 'ajax.php?action=import_faculty_csv',
+				type: 'POST',
+				data: formData,
+				processData: false,
+				contentType: false,
+				success: function(resp) {
+					console.log('Response received:', resp);
+					try {
+						resp = JSON.parse(resp);
+						if(resp.status == 'success') {
+							alert_toast(resp.message, 'success');
+							if(resp.errors && resp.errors.length > 0) {
+								var errorMsg = '<div class="alert alert-warning"><ul>';
+								resp.errors.forEach(function(error) {
+									errorMsg += '<li>' + error + '</li>';
+								});
+								errorMsg += '</ul></div>';
+								$('#import-message').html(errorMsg);
+							}
+							setTimeout(function() {
+								location.reload();
+							}, 1500);
+						} else {
+							$('#import-message').html('<div class="alert alert-danger">' + resp.message + '</div>');
+						}
+					} catch(e) {
+						console.error('Error parsing response:', e);
+						$('#import-message').html('<div class="alert alert-danger">Error processing response: ' + e.message + '</div>');
 					}
-					setTimeout(function(){
-						location.reload();
-					}, 1500);
-				} else {
-					alert_toast(resp.message, 'error');
+					end_load();
+				},
+				error: function(xhr, status, error) {
+					console.error('AJAX error:', error);
+					$('#import-message').html('<div class="alert alert-danger">Error uploading file: ' + error + '</div>');
 					end_load();
 				}
-			},
-			error: function(err){
-				console.log(err);
-				alert_toast('An error occurred', 'error');
-				end_load();
-			}
+			});
 		});
 	});
 </script>
@@ -192,13 +210,15 @@
           <div class="form-group">
             <label for="facultyCSV">Upload CSV File</label>
             <input type="file" class="form-control-file" id="facultyCSV" name="facultyCSV" accept=".csv" required>
+            <small class="form-text text-muted">Please use the sample template format.</small>
           </div>
-          <a href="templates/sample_faculty_import.csv" download>Download Sample CSV Template</a>
+          <div id="import-message"></div>
+          <a href="templates/sample_faculty_import.csv" download class="btn btn-link">Download Sample CSV Template</a>
         </form>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        <button type="submit" form="bulkFacultyForm" class="btn btn-primary">Upload</button>
+        <button type="button" class="btn btn-primary" id="uploadFacultyBtn">Upload</button>
       </div>
     </div>
   </div>

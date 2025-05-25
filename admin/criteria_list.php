@@ -5,6 +5,15 @@
 		background-color: #183f74 !important;
 	}
 </style>
+<?php
+$criteria = array();
+$qry = $conn->query("SELECT * FROM criteria_list order by abs(order_by) asc ");
+if ($qry->num_rows > 0):
+    while ($row = $qry->fetch_assoc()):
+        $criteria[$row['id']] = $row;
+    endwhile;
+endif;
+?>
 <div class="col-lg-12">
 	<div class="card card-outline card-primary">
 		<div class="card-header">
@@ -16,11 +25,18 @@
 						<div class="card card-outline card-info">
 							<div class="card-header"><b>Criteria Form</b></div>
 							<div class="card-body">
-								<form action="" id="manage-criteria">
+								<form action="" id="manage-criteria" method="POST">
 									<input type="hidden" name="id">
 									<div class="form-group">
 										<label for="">Criteria</label>
-										<input type="text" name="criteria" class="form-control form-control-sm">
+										<input type="text" name="criteria" class="form-control form-control-sm" required>
+									</div>
+									<div class="form-group type-group">
+										<label for="">Type</label>
+										<select name="type" class="form-control form-control-sm" required>
+											<option value="checklist">5-1 Rating Checklist</option>
+											<option value="textfield">Textfield Comment</option>
+										</select>
 									</div>
 								</form>
 							</div>
@@ -36,7 +52,6 @@
 					<div class="col-md-8">
 						<div class="callout callout-info">
 							<?php
-							$qry = $conn->query("SELECT * FROM criteria_list order by abs(order_by) asc ");
 							if ($qry->num_rows > 0):
 								?>
 								<div class="d-flex justify-content-between w-100">
@@ -48,9 +63,7 @@
 								<form action="" id="order-criteria">
 									<ul class="list-group btn col-md-8" id="ui-sortable-list">
 										<?php
-										$criteria = array();
-										while ($row = $qry->fetch_assoc()):
-											$criteria[$row['id']] = $row;
+										foreach ($criteria as $row):
 											?>
 											<li class="list-group-item text-left">
 												<span class="btn-group drop right float-right">
@@ -69,9 +82,8 @@
 												<i class="fa fa-bars"></i> <?php echo ucwords($row['criteria']) ?>
 												<input type="hidden" name="criteria_id[]" value="<?php echo $row['id'] ?>">
 											</li>
-										<?php endwhile; ?>
-								</form>
-								</ul>
+										<?php endforeach; ?>
+									</ul>
 								</form>
 							<?php else: ?>
 								<center>There's no criteria in the database yet</center>
@@ -93,13 +105,14 @@
 		$('#ui-sortable-list').sortable()
 		$('.edit_criteria').click(function () {
 			var id = $(this).attr('data-id')
-			var criteria = <?php echo json_encode($criteria) ?>;
+			var criteria = <?php echo json_encode($criteria); ?>;
 			$('#manage-criteria').find("[name='id']").val(criteria[id].id)
 			$('#manage-criteria').find("[name='criteria']").val(criteria[id].criteria)
-
+			$('.type-group').hide()
 		})
 		$('#manage-criteria').on('reset', function () {
 			$(this).find('input:hidden').val('')
+			$('.type-group').show()
 		})
 		$('.delete_criteria').click(function () {
 			_conf("Are you sure to delete this criteria?", "delete_criteria", [$(this).attr('data-id')])
@@ -117,15 +130,24 @@
 				method: 'POST',
 				data: $(this).serialize(),
 				success: function (resp) {
+					console.log('Response:', resp);
 					if (resp == 1) {
 						alert_toast("Data successfully saved.", "success");
 						setTimeout(function () {
-							location.reload()
+							location.href = 'index.php?page=criteria_list'
 						}, 1750)
 					} else if (resp == 2) {
 						$('#msg').html('<div class="alert alert-danger"><i class="fa fa-exclamation-triangle"></i> Criteria already exist.</div>')
 						end_load()
+					} else {
+						$('#msg').html('<div class="alert alert-danger"><i class="fa fa-exclamation-triangle"></i> Error saving criteria. Please try again.</div>')
+						end_load()
 					}
+				},
+				error: function(xhr, status, error) {
+					console.error('AJAX Error:', error);
+					$('#msg').html('<div class="alert alert-danger"><i class="fa fa-exclamation-triangle"></i> Error: ' + error + '</div>')
+					end_load()
 				}
 			})
 		})

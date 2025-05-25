@@ -410,6 +410,7 @@ class Action
                 }
             }
         }
+        
         $chk = $this->db->query("SELECT * FROM criteria_list where (" . str_replace(",", 'and', $data) . ") and id != '{$id}' ")->num_rows;
         if ($chk > 0) {
             return 2;
@@ -419,13 +420,24 @@ class Action
             $lastOrder = $this->db->query("SELECT * FROM criteria_list order by abs(order_by) desc limit 1");
             $lastOrder = $lastOrder->num_rows > 0 ? $lastOrder->fetch_array()['order_by'] + 1 : 0;
             $data .= ", order_by='$lastOrder' ";
-            $save = $this->db->query("INSERT INTO criteria_list set $data");
+            $sql = "INSERT INTO criteria_list set $data";
+            error_log("SQL Query: " . $sql);
+            $save = $this->db->query($sql);
+            if (!$save) {
+                error_log("MySQL Error: " . $this->db->error);
+            }
         } else {
-            $save = $this->db->query("UPDATE criteria_list set $data where id = $id");
+            $sql = "UPDATE criteria_list set $data where id = $id";
+            error_log("SQL Query: " . $sql);
+            $save = $this->db->query($sql);
+            if (!$save) {
+                error_log("MySQL Error: " . $this->db->error);
+            }
         }
         if ($save) {
             return 1;
         }
+        return 0;
     }
     function delete_criteria()
     {
@@ -450,26 +462,19 @@ class Action
     function save_question()
     {
         extract($_POST);
-        $data = "";
-        foreach ($_POST as $k => $v) {
-            if (!in_array($k, array('id', 'user_ids')) && !is_numeric($k)) {
-                if (empty($data)) {
-                    $data .= " $k='$v' ";
-                } else {
-                    $data .= ", $k='$v' ";
-                }
-            }
-        }
-
-        if (empty($id)) {
+        $data = " academic_id = '$academic_id' ";
+        $data .= ", criteria_id = '$criteria_id' ";
+        $data .= ", question = '$question' ";
+        $data .= ", type = '$type' ";
+        if(empty($id)) {
             $lastOrder = $this->db->query("SELECT * FROM question_list where academic_id = $academic_id order by abs(order_by) desc limit 1");
             $lastOrder = $lastOrder->num_rows > 0 ? $lastOrder->fetch_array()['order_by'] + 1 : 0;
             $data .= ", order_by='$lastOrder' ";
-            $save = $this->db->query("INSERT INTO question_list set $data");
+            $save = $this->db->query("INSERT INTO question_list set ".$data);
         } else {
-            $save = $this->db->query("UPDATE question_list set $data where id = $id");
+            $save = $this->db->query("UPDATE question_list set ".$data." where id = ".$id);
         }
-        if ($save) {
+        if($save) {
             return 1;
         }
     }
@@ -697,11 +702,21 @@ class Action
             foreach ($qid as $k => $v) {
                 $data = " evaluation_id = $eid ";
                 $data .= ", question_id = $v ";
+                // Get question type
+                $qtype = $this->db->query("SELECT type FROM question_list WHERE id = $v")->fetch_array()['type'];
+                if($qtype == 'checklist') {
                 $data .= ", rate = {$rate[$v]} ";
-                $ins[] = $this->db->query("INSERT INTO evaluation_answers set $data ");
+                    $data .= ", comment = NULL ";
+                } else {
+                    $data .= ", rate = 0 "; // Set rate to 0 for textfield responses instead of NULL
+                    $comment = $this->db->real_escape_string($rate[$v]); // Properly escape the comment text
+                    $data .= ", comment = '$comment' "; // Store textfield response in comment field
+                }
+                $ins[] = $this->db->query("INSERT INTO evaluation_answers set $data");
             }
-            if (isset($ins))
+            if (isset($ins)) {
                 return 1;
+            }
         }
     }
     function get_class()
@@ -719,16 +734,31 @@ class Action
     {
         extract($_POST);
         $data = array();
-        $get = $this->db->query("SELECT * FROM evaluation_answers where evaluation_id in (SELECT evaluation_id FROM evaluation_list where academic_id = {$_SESSION['academic']['id']} and faculty_id = $faculty_id and subject_id = $subject_id and class_id = $class_id ) ");
+        $get = $this->db->query("SELECT ea.*, ql.type as question_type FROM evaluation_answers ea 
+                                INNER JOIN question_list ql ON ea.question_id = ql.id 
+                                WHERE ea.evaluation_id in (
+                                    SELECT evaluation_id FROM evaluation_list 
+                                    WHERE academic_id = {$_SESSION['academic']['id']} 
+                                    AND faculty_id = $faculty_id 
+                                    AND subject_id = $subject_id 
+                                    AND class_id = $class_id
+                                )");
         $answered = $this->db->query("SELECT * FROM evaluation_list where academic_id = {$_SESSION['academic']['id']} and faculty_id = $faculty_id and subject_id = $subject_id and class_id = $class_id");
         $rate = array();
+        $comments = array();
+        
         while ($row = $get->fetch_assoc()) {
+            if($row['question_type'] == 'checklist') {
             if (!isset($rate[$row['question_id']][$row['rate']]))
                 $rate[$row['question_id']][$row['rate']] = 0;
             $rate[$row['question_id']][$row['rate']] += 1;
-
+            } else {
+                if (!isset($comments[$row['question_id']]))
+                    $comments[$row['question_id']] = array();
+                $comments[$row['question_id']][] = $row['comment'];
         }
-        // $data[]= $row;
+        }
+
         $ta = $answered->num_rows;
         $r = array();
         foreach ($rate as $qk => $qv) {
@@ -738,9 +768,9 @@ class Action
         }
         $data['tse'] = $ta;
         $data['data'] = $r;
+        $data['comments'] = $comments;
 
         return json_encode($data);
-
     }
     function deactivate_faculty()
     {
@@ -775,6 +805,10 @@ class Action
     }
 
     function import_students_csv($file) {
+        if (!isset($file['tmp_name']) || empty($file['tmp_name'])) {
+            return ['status' => 'error', 'message' => 'No file uploaded'];
+        }
+
         if (($handle = fopen($file['tmp_name'], "r")) !== FALSE) {
             $header = fgetcsv($handle); // Get header row
             $required_fields = ['school_id', 'firstname', 'lastname', 'class_id', 'email', 'password', 'status'];
@@ -793,47 +827,51 @@ class Action
                 
                 // Validate required fields
                 if (empty($row['school_id']) || empty($row['firstname']) || empty($row['lastname']) || 
-                    empty($row['email']) || empty($row['password'])) {
+                    empty($row['email']) || empty($row['password']) || empty($row['class_id'])) {
                     $failed++;
-                    $row_num = $failed;
-                    $errors[] = "Row " . $row_num . ": Missing required fields";
+                    $errors[] = "Row " . ($success + $failed) . ": Missing required fields";
                     continue;
                 }
 
                 // Check for duplicate email
-                $check = $this->db->query("SELECT * FROM student_list where email = '{$row['email']}'")->num_rows;
+                $check = $this->db->query("SELECT * FROM student_list where email = '" . $this->db->real_escape_string($row['email']) . "'")->num_rows;
                 if ($check > 0) {
                     $failed++;
-                    $row_num = $failed;
-                    $errors[] = "Row " . $row_num . ": Email {$row['email']} already exists";
+                    $errors[] = "Row " . ($success + $failed) . ": Email {$row['email']} already exists";
                     continue;
                 }
 
                 // Check for duplicate school_id
-                $check = $this->db->query("SELECT * FROM student_list where school_id = '{$row['school_id']}'")->num_rows;
+                $check = $this->db->query("SELECT * FROM student_list where school_id = '" . $this->db->real_escape_string($row['school_id']) . "'")->num_rows;
                 if ($check > 0) {
                     $failed++;
-                    $row_num = $failed;
-                    $errors[] = "Row " . $row_num . ": School ID {$row['school_id']} already exists";
+                    $errors[] = "Row " . ($success + $failed) . ": School ID {$row['school_id']} already exists";
+                    continue;
+                }
+
+                // Validate class_id exists
+                $check = $this->db->query("SELECT * FROM class_list where id = '" . (int)$row['class_id'] . "'")->num_rows;
+                if ($check == 0) {
+                    $failed++;
+                    $errors[] = "Row " . ($success + $failed) . ": Invalid Class ID {$row['class_id']}";
                     continue;
                 }
 
                 // Prepare data for insertion
-                $data = " school_id = '{$row['school_id']}' ";
-                $data .= ", firstname = '{$row['firstname']}' ";
-                $data .= ", lastname = '{$row['lastname']}' ";
-                $data .= ", class_id = '{$row['class_id']}' ";
-                $data .= ", email = '{$row['email']}' ";
-                $data .= ", password = '" . md5($row['password']) . "' ";
-                $data .= ", status = '" . ($row['status'] ?? 1) . "' ";
+                $data = " school_id = '" . $this->db->real_escape_string($row['school_id']) . "' ";
+                $data .= ", firstname = '" . $this->db->real_escape_string($row['firstname']) . "' ";
+                $data .= ", lastname = '" . $this->db->real_escape_string($row['lastname']) . "' ";
+                $data .= ", email = '" . $this->db->real_escape_string($row['email']) . "' ";
+                $data .= ", password = '" . md5($row['password']) . "' "; // Hash the password
+                $data .= ", class_id = '" . (int)$row['class_id'] . "' ";
+                $data .= ", status = '" . (isset($row['status']) ? (int)$row['status'] : 1) . "' ";
 
                 $save = $this->db->query("INSERT INTO student_list set $data");
                 if ($save) {
                     $success++;
                 } else {
                     $failed++;
-                    $row_num = $failed;
-                    $errors[] = "Row " . $row_num . ": Database error";
+                    $errors[] = "Row " . ($success + $failed) . ": Database error - " . $this->db->error;
                 }
             }
             fclose($handle);
@@ -848,6 +886,10 @@ class Action
     }
 
     function import_faculty_csv($file) {
+        if (!isset($file['tmp_name']) || empty($file['tmp_name'])) {
+            return ['status' => 'error', 'message' => 'No file uploaded'];
+        }
+
         if (($handle = fopen($file['tmp_name'], "r")) !== FALSE) {
             $header = fgetcsv($handle); // Get header row
             $required_fields = ['school_id', 'firstname', 'lastname', 'email', 'password', 'status'];
@@ -868,44 +910,40 @@ class Action
                 if (empty($row['school_id']) || empty($row['firstname']) || empty($row['lastname']) || 
                     empty($row['email']) || empty($row['password'])) {
                     $failed++;
-                    $row_num = $failed;
-                    $errors[] = "Row " . $row_num . ": Missing required fields";
+                    $errors[] = "Row " . ($success + $failed) . ": Missing required fields";
                     continue;
                 }
 
                 // Check for duplicate email
-                $check = $this->db->query("SELECT * FROM faculty_list where email = '{$row['email']}'")->num_rows;
+                $check = $this->db->query("SELECT * FROM faculty_list where email = '" . $this->db->real_escape_string($row['email']) . "'")->num_rows;
                 if ($check > 0) {
                     $failed++;
-                    $row_num = $failed;
-                    $errors[] = "Row " . $row_num . ": Email {$row['email']} already exists";
+                    $errors[] = "Row " . ($success + $failed) . ": Email {$row['email']} already exists";
                     continue;
                 }
 
                 // Check for duplicate school_id
-                $check = $this->db->query("SELECT * FROM faculty_list where school_id = '{$row['school_id']}'")->num_rows;
+                $check = $this->db->query("SELECT * FROM faculty_list where school_id = '" . $this->db->real_escape_string($row['school_id']) . "'")->num_rows;
                 if ($check > 0) {
                     $failed++;
-                    $row_num = $failed;
-                    $errors[] = "Row " . $row_num . ": School ID {$row['school_id']} already exists";
+                    $errors[] = "Row " . ($success + $failed) . ": School ID {$row['school_id']} already exists";
                     continue;
                 }
 
                 // Prepare data for insertion
-                $data = " school_id = '{$row['school_id']}' ";
-                $data .= ", firstname = '{$row['firstname']}' ";
-                $data .= ", lastname = '{$row['lastname']}' ";
-                $data .= ", email = '{$row['email']}' ";
-                $data .= ", password = '" . md5($row['password']) . "' ";
-                $data .= ", status = '" . ($row['status'] ?? 1) . "' ";
+                $data = " school_id = '" . $this->db->real_escape_string($row['school_id']) . "' ";
+                $data .= ", firstname = '" . $this->db->real_escape_string($row['firstname']) . "' ";
+                $data .= ", lastname = '" . $this->db->real_escape_string($row['lastname']) . "' ";
+                $data .= ", email = '" . $this->db->real_escape_string($row['email']) . "' ";
+                $data .= ", password = '" . md5($row['password']) . "' "; // Hash the password
+                $data .= ", status = '" . (isset($row['status']) ? (int)$row['status'] : 1) . "' ";
 
                 $save = $this->db->query("INSERT INTO faculty_list set $data");
                 if ($save) {
                     $success++;
                 } else {
                     $failed++;
-                    $row_num = $failed;
-                    $errors[] = "Row " . $row_num . ": Database error";
+                    $errors[] = "Row " . ($success + $failed) . ": Database error - " . $this->db->error;
                 }
             }
             fclose($handle);
@@ -939,5 +977,37 @@ class Action
         if ($save) {
             return 1;
         }
+    }
+
+    function mark_irregular($id = '') {
+        extract($_POST);
+        $data = "";
+        if(empty($id)) {
+            $data = "Invalid student ID";
+        } else {
+            $save = $this->db->query("UPDATE student_list SET type = 'irregular' WHERE id = $id");
+            if($save) {
+                $data = 1;
+            } else {
+                $data = "Error updating student status";
+            }
+        }
+        return $data;
+    }
+
+    function mark_regular($id = '') {
+        extract($_POST);
+        $data = "";
+        if(empty($id)) {
+            $data = "Invalid student ID";
+        } else {
+            $save = $this->db->query("UPDATE student_list SET type = 'regular' WHERE id = $id");
+            if($save) {
+                $data = 1;
+            } else {
+                $data = "Error updating student status";
+            }
+        }
+        return $data;
     }
 }

@@ -68,6 +68,28 @@ function ordinal_suffix($num)
 		background-color: #345821 !important;
 		border-color: #345821 !important;
 	}
+did 
+	.comments-list {
+		max-height: 200px;
+		overflow-y: auto;
+		padding: 10px;
+		background: #f8f9fa;
+		border-radius: 4px;
+	}
+
+	.comments-list ul {
+		margin: 0;
+		padding: 0;
+	}
+
+	.comments-list li {
+		padding: 8px;
+		border-bottom: 1px solid #dee2e6;
+	}
+
+	.comments-list li:last-child {
+		border-bottom: none;
+	}
 </style>
 
 <div class="container-fluid px-4">
@@ -269,11 +291,15 @@ function ordinal_suffix($num)
 							<thead>
 								<tr class="bg-primary">
 									<th><b><?php echo $crow['criteria'] ?></b></th>
+									<?php if($crow['type'] == 'checklist'): ?>
 									<th width="5%" class="text-center">1</th>
 									<th width="5%" class="text-center">2</th>
 									<th width="5%" class="text-center">3</th>
 									<th width="5%" class="text-center">4</th>
 									<th width="5%" class="text-center">5</th>
+									<?php else: ?>
+									<th width="60%" class="text-center">Comments</th>
+									<?php endif; ?>
 								</tr>
 							</thead>
 							<tbody class="tr-sortable">
@@ -286,11 +312,17 @@ function ordinal_suffix($num)
 										<td class="p-1" width="40%">
 											<?php echo $row['question'] ?>
 										</td>
-										<?php for ($c = 1; $c <= 5; $c++): ?>
-											<td class="text-center">
-												<span class="rate_<?php echo $c . '_' . $row['id'] ?> rates"></span>
+										<?php if($crow['type'] == 'checklist'): ?>
+											<?php for ($c = 1; $c <= 5; $c++): ?>
+												<td class="text-center">
+													<span class="rate_<?php echo $c . '_' . $row['id'] ?> rates"></span>
+												</td>
+											<?php endfor; ?>
+										<?php else: ?>
+											<td class="text-left">
+												<div class="comments_<?php echo $row['id'] ?> comments-list"></div>
 											</td>
-										<?php endfor; ?>
+										<?php endif; ?>
 									</tr>
 								<?php endwhile; ?>
 							</tbody>
@@ -450,12 +482,16 @@ function ordinal_suffix($num)
 					resp = JSON.parse(resp)
 					if (Object.keys(resp).length <= 0) {
 						$('.rates').text('')
+						$('.comments-list').html('')
 						$('#tse').text('')
 						$('#print-btn').hide()
 					} else {
 						$('#print-btn').show()
 						$('#tse').text(resp.tse)
 						$('.rates').text('-')
+						$('.comments-list').html('')
+						
+						// Handle checklist ratings
 						var data = resp.data
 						Object.keys(data).map(q => {
 							Object.keys(data[q]).map(r => {
@@ -463,8 +499,21 @@ function ordinal_suffix($num)
 								$('.rate_' + r + '_' + q).text(data[q][r] + '%')
 							})
 						})
+						
+						// Handle comments
+						if(resp.comments) {
+							Object.keys(resp.comments).map(q => {
+								var commentsHtml = '<ul class="list-unstyled mb-0">';
+								resp.comments[q].forEach(comment => {
+									if(comment && comment.trim() !== '') {
+										commentsHtml += '<li class="mb-2">' + comment + '</li>';
+									}
+								});
+								commentsHtml += '</ul>';
+								$('.comments_' + q).html(commentsHtml);
+							});
+						}
 					}
-
 				}
 			},
 			complete: function () {

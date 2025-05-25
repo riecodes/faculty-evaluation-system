@@ -14,16 +14,45 @@ function ordinal_suffix($num)
 	}
 	return $num . 'th';
 }
+
+// Check if student is irregular
+$student_type = $conn->query("SELECT type FROM student_list WHERE id = {$_SESSION['login_id']}")->fetch_assoc()['type'];
+$is_irregular = ($student_type == 'irregular');
+
 $rid = '';
 $faculty_id = '';
 $subject_id = '';
+$class_id = '';
+
 if (isset($_GET['rid']))
 	$rid = $_GET['rid'];
 if (isset($_GET['fid']))
 	$faculty_id = $_GET['fid'];
 if (isset($_GET['sid']))
 	$subject_id = $_GET['sid'];
-$restriction = $conn->query("SELECT r.id,s.id as sid,f.id as fid,f.avatar,concat(f.firstname,' ',f.lastname) as faculty,s.code,s.subject FROM restriction_list r inner join faculty_list f on f.id = r.faculty_id inner join subject_list s on s.id = r.subject_id where academic_id ={$_SESSION['academic']['id']} and class_id = {$_SESSION['login_class_id']} and r.id not in (SELECT restriction_id from evaluation_list where academic_id ={$_SESSION['academic']['id']} and student_id = {$_SESSION['login_id']} ) ");
+if (isset($_GET['cid']))
+	$class_id = $_GET['cid'];
+
+// Get restrictions based on student type
+if ($is_irregular) {
+    // For irregular students, get all active faculty and subjects
+    $faculty_list = $conn->query("SELECT id, avatar, concat(firstname,' ',lastname) as faculty FROM faculty_list WHERE status = 1 ORDER BY lastname, firstname");
+    $subject_list = $conn->query("SELECT id, code, subject FROM subject_list ORDER BY code");
+    $class_list = $conn->query("SELECT id, concat(curriculum,' ',level,' - ',section) as class_name FROM class_list ORDER BY curriculum, level, section");
+} else {
+    // For regular students, get restrictions as before
+    $restriction = $conn->query("SELECT r.id,s.id as sid,f.id as fid,f.avatar,concat(f.firstname,' ',f.lastname) as faculty,s.code,s.subject 
+        FROM restriction_list r 
+        inner join faculty_list f on f.id = r.faculty_id 
+        inner join subject_list s on s.id = r.subject_id 
+        where academic_id ={$_SESSION['academic']['id']} 
+        and class_id = {$_SESSION['login_class_id']} 
+        and r.id not in (
+            SELECT restriction_id from evaluation_list 
+            where academic_id ={$_SESSION['academic']['id']} 
+            and student_id = {$_SESSION['login_id']} 
+        )");
+}
 ?>
 
 <!-- Owl Carousel CSS -->
@@ -57,9 +86,66 @@ $restriction = $conn->query("SELECT r.id,s.id as sid,f.id as fid,f.avatar,concat
 <!-- Owl Carousel JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/owl.carousel.min.js"></script>
 
-<div class="col-lg-12 ">
+<div class="col-lg-12">
 	<div class="row d-flex flex-column justify-content-center align-items-center">
 		<div class="col-md-9">
+            <?php if ($is_irregular): ?>
+            <!-- Irregular Student Selection Form -->
+            <div class="card card-outline card-info mb-4">
+                <div class="card-header">
+                    <b>Select Faculty, Subject, and Section</b>
+                </div>
+                <div class="card-body">
+                    <form id="irregular-selection">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="faculty">Faculty</label>
+                                    <select class="form-control" id="faculty" name="faculty_id" required>
+                                        <option value="">Select Faculty</option>
+                                        <?php while($row = $faculty_list->fetch_assoc()): ?>
+                                            <option value="<?php echo $row['id'] ?>" <?php echo $faculty_id == $row['id'] ? 'selected' : '' ?>>
+                                                <?php echo ucwords($row['faculty']) ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="subject">Subject</label>
+                                    <select class="form-control" id="subject" name="subject_id" required>
+                                        <option value="">Select Subject</option>
+                                        <?php while($row = $subject_list->fetch_assoc()): ?>
+                                            <option value="<?php echo $row['id'] ?>" <?php echo $subject_id == $row['id'] ? 'selected' : '' ?>>
+                                                <?php echo $row['code'] . ' - ' . $row['subject'] ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="class">Section</label>
+                                    <select class="form-control" id="class" name="class_id" required>
+                                        <option value="">Select Section</option>
+                                        <?php while($row = $class_list->fetch_assoc()): ?>
+                                            <option value="<?php echo $row['id'] ?>" <?php echo $class_id == $row['id'] ? 'selected' : '' ?>>
+                                                <?php echo $row['class_name'] ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3">
+                            <button type="submit" class="btn btn-primary">Proceed to Evaluation</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <?php else: ?>
+            <!-- Regular Student Faculty Carousel -->
 			<div class="owl-carousel owl-theme faculty-carousel">
 				<?php
 				while ($row = $restriction->fetch_array()):
@@ -87,6 +173,7 @@ $restriction = $conn->query("SELECT r.id,s.id as sid,f.id as fid,f.avatar,concat
 					</div>
 				<?php endwhile; ?>
 			</div>
+            <?php endif; ?>
 		</div>
 		<div class="col-md-9">
 			<div class="card card-outline card-info">
@@ -140,7 +227,7 @@ $restriction = $conn->query("SELECT r.id,s.id as sid,f.id as fid,f.avatar,concat
 						</div>
 					</fieldset>
 					<form id="manage-evaluation">
-						<input type="hidden" name="class_id" value="<?php echo $_SESSION['login_class_id'] ?>">
+						<input type="hidden" name="class_id" value="<?php echo $is_irregular ? $class_id : $_SESSION['login_class_id'] ?>">
 						<input type="hidden" name="faculty_id" value="<?php echo $faculty_id ?>">
 						<input type="hidden" name="restriction_id" value="<?php echo $rid ?>">
 						<input type="hidden" name="subject_id" value="<?php echo $subject_id ?>">
@@ -173,16 +260,22 @@ $restriction = $conn->query("SELECT r.id,s.id as sid,f.id as fid,f.avatar,concat
 												<?php echo $row['question'] ?>
 												<input type="hidden" name="qid[]" value="<?php echo $row['id'] ?>">
 											</td>
-											<?php for ($c = 1; $c <= 5; $c++): ?>
-												<td class="text-center">
-													<div class="icheck-success d-inline">
-														<input type="radio" name="rate[<?php echo $row['id'] ?>]" <?php echo $c == 5 ? "checked" : '' ?> id="qradio<?php echo $row['id'] . '_' . $c ?>"
-															value="<?php echo $c ?>">
-														<label for="qradio<?php echo $row['id'] . '_' . $c ?>">
-														</label>
-													</div>
+											<?php if($row['type'] == 'checklist'): ?>
+												<?php for ($c = 1; $c <= 5; $c++): ?>
+													<td class="text-center">
+														<div class="icheck-success d-inline">
+															<input type="radio" name="rate[<?php echo $row['id'] ?>]" <?php echo $c == 5 ? "checked" : '' ?> id="qradio<?php echo $row['id'] . '_' . $c ?>"
+																value="<?php echo $c ?>">
+															<label for="qradio<?php echo $row['id'] . '_' . $c ?>">
+															</label>
+														</div>
+													</td>
+												<?php endfor; ?>
+											<?php else: ?>
+												<td colspan="5">
+													<textarea name="rate[<?php echo $row['id'] ?>]" class="form-control" rows="2" required></textarea>
 												</td>
-											<?php endfor; ?>
+											<?php endif; ?>
 										</tr>
 									<?php endwhile; ?>
 								</tbody>
@@ -196,17 +289,18 @@ $restriction = $conn->query("SELECT r.id,s.id as sid,f.id as fid,f.avatar,concat
 </div>
 <script>
 	$(document).ready(function () {
-		// Initialize Owl Carousel
+		<?php if (!$is_irregular): ?>
+		// Initialize Owl Carousel for regular students
 		var totalItems = $('.faculty-carousel .item').length;
-		var itemsToShow = Math.min(totalItems, 3); // Show up to 3 items, or less if fewer items exist
+		var itemsToShow = Math.min(totalItems, 3);
 		
 		$('.faculty-carousel').owlCarousel({
 			items: itemsToShow,
-			loop: totalItems > 3, // Only loop if we have more than 3 items
+			loop: totalItems > 3,
 			margin: 10,
-			nav: totalItems > itemsToShow, // Only show navigation if we have more items than what's being displayed
+			nav: totalItems > itemsToShow,
 			dots: true,
-			autoplay: totalItems > itemsToShow, // Only autoplay if we have more items than what's being displayed
+			autoplay: totalItems > itemsToShow,
 			autoplayTimeout: 5000,
 			autoplayHoverPause: true,
 			smartSpeed: 1000,
@@ -223,6 +317,21 @@ $restriction = $conn->query("SELECT r.id,s.id as sid,f.id as fid,f.avatar,concat
 				}
 			}
 		});
+		<?php endif; ?>
+
+		// Handle irregular student selection form
+		$('#irregular-selection').submit(function(e) {
+			e.preventDefault();
+			var faculty = $('#faculty').val();
+			var subject = $('#subject').val();
+			var class_id = $('#class').val();
+			
+			if (faculty && subject && class_id) {
+				window.location.href = './index.php?page=evaluate&fid=' + faculty + '&sid=' + subject + '&cid=' + class_id;
+			} else {
+				alert_toast("Please select all required fields", "error");
+			}
+		});
 
 		if ('<?php echo $_SESSION['academic']['status'] ?>' == 0) {
 			uni_modal("Information", "<?php echo $_SESSION['login_view_folder'] ?>not_started.php")
@@ -232,24 +341,48 @@ $restriction = $conn->query("SELECT r.id,s.id as sid,f.id as fid,f.avatar,concat
 		else if ('<?php echo $_SESSION['academic']['status'] ?>' == 2) {
 			uni_modal("Information", "<?php echo $_SESSION['login_view_folder'] ?>closed.php")
 		}
-		if (<?php echo empty($rid) ? 1 : 0 ?> == 1)
+		if (<?php echo empty($rid) && !$is_irregular ? 1 : 0 ?> == 1)
 			uni_modal("Information", "<?php echo $_SESSION['login_view_folder'] ?>done.php")
 	})
-	$('#manage-evaluation').submit(function (e) {
+	
+	$('#manage-evaluation').submit(function(e) {
 		e.preventDefault();
-		start_load()
+		start_load();
+		
+		// Validate form
+		var isValid = true;
+		$(this).find('textarea[required]').each(function() {
+			if (!$(this).val().trim()) {
+				isValid = false;
+				return false;
+			}
+		});
+		
+		if (!isValid) {
+			alert_toast("Please fill in all required fields", "error");
+			end_load();
+			return false;
+		}
+		
 		$.ajax({
 			url: 'ajax.php?action=save_evaluation',
 			method: 'POST',
 			data: $(this).serialize(),
 			success: function (resp) {
 				if (resp == 1) {
-					alert_toast("Data successfully saved.", "success");
+					alert_toast("Evaluation submitted successfully.", "success");
 					setTimeout(function () {
-						location.reload()
-					}, 1750)
+						location.reload();
+					}, 1750);
+				} else {
+					alert_toast("Error: " + resp, "error");
+					end_load();
 				}
+			},
+			error: function(xhr, status, error) {
+				alert_toast("Error submitting evaluation. Please try again.", "error");
+				end_load();
 			}
-		})
-	})
+		});
+	});
 </script>

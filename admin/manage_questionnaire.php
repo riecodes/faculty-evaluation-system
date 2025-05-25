@@ -87,7 +87,7 @@ function ordinal_suffix($num)
 								$criteria = $conn->query("SELECT * FROM criteria_list order by abs(order_by) asc ");
 								while ($row = $criteria->fetch_assoc()):
 									?>
-									<option value="<?php echo $row['id'] ?>"><?php echo $row['criteria'] ?></option>
+									<option value="<?php echo $row['id'] ?>" data-type="<?php echo $row['type'] ?>"><?php echo $row['criteria'] ?></option>
 								<?php endwhile; ?>
 							</select>
 						</div>
@@ -96,6 +96,7 @@ function ordinal_suffix($num)
 							<textarea name="question" id="question" cols="30" rows="4" class="form-control"
 								required=""><?php echo isset($question) ? $question : '' ?></textarea>
 						</div>
+						<input type="hidden" name="type" id="question_type">
 					</form>
 				</div>
 				<div class="card-footer bg-light">
@@ -208,16 +209,22 @@ function ordinal_suffix($num)
 												<?php echo $row['question'] ?>
 												<input type="hidden" name="qid[]" value="<?php echo $row['id'] ?>">
 											</td>
-											<?php for ($c = 0; $c < 5; $c++): ?>
-												<td class="text-center">
-													<div class="icheck-success d-inline">
-														<input type="radio" name="qid[<?php echo $row['id'] ?>][]"
-															id="qradio<?php echo $row['id'] . '_' . $c ?>">
-														<label for="qradio<?php echo $row['id'] . '_' . $c ?>">
-														</label>
-													</div>
+											<?php if($row['type'] == 'checklist'): ?>
+												<?php for ($c = 0; $c < 5; $c++): ?>
+													<td class="text-center">
+														<div class="icheck-success d-inline">
+															<input type="radio" name="qid[<?php echo $row['id'] ?>][]"
+																id="qradio<?php echo $row['id'] . '_' . $c ?>">
+															<label for="qradio<?php echo $row['id'] . '_' . $c ?>">
+															</label>
+														</div>
+													</td>
+												<?php endfor; ?>
+											<?php else: ?>
+												<td colspan="5">
+													<textarea name="qid[<?php echo $row['id'] ?>]" class="form-control" rows="2" required></textarea>
 												</td>
-											<?php endfor; ?>
+											<?php endif; ?>
 										</tr>
 									<?php endwhile; ?>
 								</tbody>
@@ -236,6 +243,13 @@ function ordinal_suffix($num)
 			placeholder: "Please select here",
 			width: "100%"
 		});
+
+		// Update question type based on selected criteria
+		$('#criteria_id').change(function() {
+			var selectedOption = $(this).find('option:selected');
+			var criteriaType = selectedOption.data('type');
+			$('#question_type').val(criteriaType);
+		});
 	})
 	$('.edit_question').click(function () {
 		var id = $(this).attr('data-id')
@@ -243,6 +257,7 @@ function ordinal_suffix($num)
 		$('#manage-question').find("[name='id']").val(question[id].id)
 		$('#manage-question').find("[name='question']").val(question[id].question)
 		$('#manage-question').find("[name='criteria_id']").val(question[id].criteria_id).trigger('change')
+		$('#manage-question').find("[name='type']").val(question[id].type)
 	})
 	$('.delete_question').click(function () {
 		_conf("Are you sure to delete this question?", "delete_question", [$(this).attr('data-id')])
