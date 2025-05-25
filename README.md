@@ -62,7 +62,7 @@ A comprehensive web-based system for managing and conducting faculty evaluations
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/faculty-evaluation-system.git
+   git clone https://github.com/riecodes/faculty-evaluation-system.git
    ```
 
 2. Set up the database:
