@@ -290,6 +290,12 @@
                 <p>List</p>
               </a>
             </li>
+            <li class="nav-item">
+              <a href="./index.php?page=manage_irregular_enrollments" class="nav-link nav-manage_irregular_enrollments tree-item">
+                <i class="fas fa-angle-right nav-icon"></i>
+                <p>Manage Irregular</p>
+              </a>
+            </li>
           </ul>
         </li>
         <li class="nav-item dropdown">

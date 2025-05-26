@@ -171,10 +171,18 @@ function ordinal_suffix($num)
 							s.email,
 							s.type as student_type
 						FROM student_list s
-						INNER JOIN class_list c ON c.id = s.class_id
-						INNER JOIN restriction_list r ON r.class_id = c.id AND r.type = s.type
-						INNER JOIN faculty_list f ON f.id = r.faculty_id
-						INNER JOIN subject_list sub ON sub.id = r.subject_id
+						LEFT JOIN class_list c ON c.id = s.class_id
+						LEFT JOIN (
+							SELECT DISTINCT e.student_id, e.faculty_id, e.subject_id, e.class_id, e.academic_id, e.restriction_id
+							FROM irregular_enrollments e
+							WHERE e.academic_id = {$_SESSION['academic']['id']}
+						) e ON e.student_id = s.id
+						LEFT JOIN restriction_list r ON (
+							(s.type = 'regular' AND r.class_id = s.class_id AND r.type = 'regular') OR
+							(s.type = 'irregular' AND r.id = e.restriction_id AND r.type = 'irregular')
+						)
+						LEFT JOIN faculty_list f ON f.id = r.faculty_id
+						LEFT JOIN subject_list sub ON sub.id = r.subject_id
 						WHERE r.academic_id = {$_SESSION['academic']['id']}
 						AND r.id NOT IN (
 							SELECT restriction_id 

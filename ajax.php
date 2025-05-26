@@ -552,5 +552,23 @@ if ($action == 'delete_restriction') {
     exit;
 }
 
+if ($action == 'save_enrollment') {
+    $save = $crud->save_enrollment();
+    if ($save)
+        echo $save;
+}
+
+if ($action == 'get_enrollment') {
+    $get = $crud->get_enrollment();
+    if ($get)
+        echo $get;
+}
+
+if ($action == 'delete_enrollment') {
+    $delete = $crud->delete_enrollment();
+    if ($delete)
+        echo $delete;
+}
+
 ob_end_flush();
 ?>

@@ -192,7 +192,7 @@
           <a>
             <i class=""></i>
             <p>
-            <span style="color: var(--sidebar-bg)">s</span>
+            
             </p>
           </a>
         </li>

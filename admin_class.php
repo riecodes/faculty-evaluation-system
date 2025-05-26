@@ -666,6 +666,93 @@ class Action
             return 1;
         }
     }
+    function save_enrollment()
+    {
+        extract($_POST);
+        $data = "";
+        foreach ($_POST as $k => $v) {
+            if (!in_array($k, array('id')) && !is_numeric($k)) {
+                if (empty($data)) {
+                    $data .= " $k='$v' ";
+                } else {
+                    $data .= ", $k='$v' ";
+                }
+            }
+        }
+
+        // Start transaction
+        $this->db->query("START TRANSACTION");
+        
+        try {
+            if (empty($id)) {
+                // For new enrollments, first create the restriction
+                $restriction_data = " academic_id = '{$_POST['academic_id']}' ";
+                $restriction_data .= ", faculty_id = '{$_POST['faculty_id']}' ";
+                $restriction_data .= ", subject_id = '{$_POST['subject_id']}' ";
+                $restriction_data .= ", class_id = '{$_POST['class_id']}' ";
+                $restriction_data .= ", type = 'irregular'";
+                
+                $save_restriction = $this->db->query("INSERT INTO restriction_list SET " . $restriction_data);
+                
+                if(!$save_restriction) {
+                    throw new Exception("Error creating restriction: " . $this->db->error);
+                }
+                
+                $restriction_id = $this->db->insert_id;
+                
+                // Now create the enrollment
+                $data .= ", restriction_id = '$restriction_id'";
+                $save = $this->db->query("INSERT INTO irregular_enrollments SET " . $data);
+            } else {
+                // For updates, first update the restriction
+                $restriction_data = " faculty_id = '{$_POST['faculty_id']}' ";
+                $restriction_data .= ", subject_id = '{$_POST['subject_id']}' ";
+                $restriction_data .= ", class_id = '{$_POST['class_id']}' ";
+                
+                // Get the restriction_id from the enrollment
+                $restriction_id = $this->db->query("SELECT restriction_id FROM irregular_enrollments WHERE id = $id")->fetch_assoc()['restriction_id'];
+                
+                if($restriction_id) {
+                    $update_restriction = $this->db->query("UPDATE restriction_list SET " . $restriction_data . " WHERE id = $restriction_id");
+                    if(!$update_restriction) {
+                        throw new Exception("Error updating restriction: " . $this->db->error);
+                    }
+                }
+                
+                // Then update the enrollment
+                $save = $this->db->query("UPDATE irregular_enrollments SET " . $data . " WHERE id = $id");
+            }
+            
+            if(!$save) {
+                throw new Exception("Error saving enrollment: " . $this->db->error);
+            }
+            
+            $this->db->query("COMMIT");
+            return 1;
+            
+        } catch (Exception $e) {
+            $this->db->query("ROLLBACK");
+            error_log("Error in save_enrollment: " . $e->getMessage());
+            return $e->getMessage();
+        }
+    }
+
+    function get_enrollment()
+    {
+        extract($_POST);
+        $data = $this->db->query("SELECT * FROM irregular_enrollments where id = $id")->fetch_assoc();
+        return json_encode(['status' => 1, 'data' => $data]);
+    }
+
+    function delete_enrollment()
+    {
+        extract($_POST);
+        $delete = $this->db->query("DELETE FROM irregular_enrollments where id = $id");
+        if ($delete) {
+            return 1;
+        }
+    }
+
     function save_restriction()
     {
         extract($_POST);
