@@ -458,4 +458,69 @@ Required Changes:
    - Add type filtering
    - Maintain consistency
    - Display evaluations without section grouping
+
+## Recent Changes
+1. [x] Fixed save_restriction() function in admin_class.php:
+   - Implemented proper transaction handling
+   - Fixed issue with restrictions being deleted incorrectly
+   - Added proper handling for:
+     * Adding new restrictions
+     * Updating existing restrictions
+     * Removing specific restrictions
+   - Added error handling and rollback
+   - Improved data integrity
+   - Fixed issues:
+     * Restrictions being deleted when adding new ones
+     * All restrictions being removed when editing
+     * Duplicate restrictions not being handled properly
+   - Added unique key tracking for restrictions
+   - Implemented proper comparison for restriction updates
+
+# Faculty Evaluation System - Issue Tracking
+
+## Issue: Text Field Comments Not Being Saved
+- Problem: Comments from text field questions (specifically question_id 10) are not being saved in the database
+- Rate values are being saved successfully, but comments are missing
+
+## Investigation Progress:
+
+### 1. Database Structure
+- Table: evaluation_answers
+- Fields: evaluation_id, question_id, rate, comment
+- Comment field is nullable
+- Foreign key constraints are properly set up
+
+### 2. Code Analysis
+- Form Submission (student/evaluate.php):
+  * Text fields are properly rendered with textarea elements
+  * Form data includes both rate and comment values
+  * Debug box added to track form submission data
+
+- Evaluation Saving (ajax.php):
+  * Found issue in evaluation answers insertion
+  * Original code only handled rate field, ignoring comments
+  * Fixed by adding proper handling for both checklist and textfield types
+
+### 3. Solution Implemented
+- Modified evaluation answers insertion code to:
+  * Check question type (checklist vs textfield)
+  * For checklist: save rate value, set comment to NULL
+  * For textfield: save comment value, set rate to 0
+  * Added proper error handling and escaping
+
+### 4. Testing
+- Form submission now includes both rate and comment values
+- Debug box shows form data being sent
+- Server response indicates successful saving
+- Comments are now being properly stored in the database
+
+## Next Steps
+- Monitor for any other text field questions that might have similar issues
+- Consider adding validation for comment length/content
+- Add logging for better debugging in production
+
+## Notes
+- Issue was primarily in the ajax.php file where evaluation answers were being inserted
+- The fix ensures proper handling of both question types while maintaining data integrity
+- Added error reporting to help identify any future issues
    

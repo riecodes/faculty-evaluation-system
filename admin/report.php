@@ -1,4 +1,5 @@
-<?php 
+<?php
+
 // Debug session
 echo "<!-- Debug Info: ";
 print_r($_SESSION);
@@ -68,8 +69,36 @@ function ordinal_suffix($num)
 		background-color: #345821 !important;
 		border-color: #345821 !important;
 	}
-did 
-	.comments-list {
+
+	/* New styles for badges and class list */
+	.badge {
+		font-size: 0.8em;
+		padding: 0.4em 0.6em;
+	}
+
+	.badge-info {
+		background-color: #17a2b8;
+	}
+
+	.badge-success {
+		background-color: #28a745;
+	}
+
+	.badge-warning {
+		background-color: #ffc107;
+		color: #212529;
+	}
+
+	.class-list-item {
+		padding: 2px 0;
+		font-size: 0.9em;
+	}
+
+	.class-list-item:not(:last-child) {
+		border-bottom: 1px solid #eee;
+	}
+
+	did .comments-list {
 		max-height: 200px;
 		overflow-y: auto;
 		padding: 10px;
@@ -93,24 +122,26 @@ did
 </style>
 
 <div class="container-fluid px-4">
-	<?php if(isset($_GET['status']) && isset($_GET['message'])): ?>
-	<div class="alert alert-<?php echo $_GET['status'] == 'success' ? 'success' : 'danger' ?> alert-dismissible" id="status-alert">
-		<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-		<?php echo htmlspecialchars($_GET['message']); ?>
-	</div>
-	<script>
-		$(document).ready(function() {
-			// Remove the status parameters from URL without refreshing
-			var url = new URL(window.location.href);
-			url.searchParams.delete('status');
-			url.searchParams.delete('message');
-			window.history.replaceState({}, '', url);
-		});
-	</script>
+	<?php if (isset($_GET['status']) && isset($_GET['message'])): ?>
+		<div class="alert alert-<?php echo $_GET['status'] == 'success' ? 'success' : 'danger' ?> alert-dismissible"
+			id="status-alert">
+			<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+			<?php echo htmlspecialchars($_GET['message']); ?>
+		</div>
+		<script>
+			$(document).ready(function () {
+				// Remove the status parameters from URL without refreshing
+				var url = new URL(window.location.href);
+				url.searchParams.delete('status');
+				url.searchParams.delete('message');
+				window.history.replaceState({}, '', url);
+			});
+		</script>
 	<?php endif; ?>
 
 	<div class="card shadow-sm border mb-4">
-		<div class="shadow-sm container-fluid px-4 p-3 mb-4 bg-primary text-white d-flex justify-content-between align-items-center">
+		<div
+			class="shadow-sm container-fluid px-4 p-3 mb-4 bg-primary text-white d-flex justify-content-between align-items-center">
 			<h5 class="card-title mb-0">Pending Evaluations</h5>
 			<a href="admin/send_reminders.php" class="btn btn-primary border-white">
 				<i class="fas fa-envelope"></i> Send Reminders
@@ -137,10 +168,11 @@ did
 							CONCAT(f.firstname, ' ', f.lastname) as faculty_name,
 							sub.subject,
 							sub.code as subject_code,
-							s.email
+							s.email,
+							s.type as student_type
 						FROM student_list s
 						INNER JOIN class_list c ON c.id = s.class_id
-						INNER JOIN restriction_list r ON r.class_id = c.id
+						INNER JOIN restriction_list r ON r.class_id = c.id AND r.type = s.type
 						INNER JOIN faculty_list f ON f.id = r.faculty_id
 						INNER JOIN subject_list sub ON sub.id = r.subject_id
 						WHERE r.academic_id = {$_SESSION['academic']['id']}
@@ -150,13 +182,41 @@ did
 							WHERE academic_id = {$_SESSION['academic']['id']} 
 							AND student_id = s.id
 						)
+						AND NOT EXISTS (
+							SELECT 1 FROM evaluation_list e
+							WHERE e.academic_id = {$_SESSION['academic']['id']}
+							AND e.student_id = s.id
+							AND e.faculty_id = f.id
+							AND e.subject_id = sub.id
+						)
 						ORDER BY s.lastname, s.firstname");
 
 						while ($row = $pending_query->fetch_assoc()):
 							?>
 							<tr>
-								<td><?php echo ucwords($row['student_name']) ?></td>
-								<td><?php echo $row['class'] ?></td>
+								<td>
+									<?php echo ucwords($row['student_name']) ?>
+									<?php if($row['student_type'] == 'irregular'): ?>
+										<span class="badge badge-info ml-2">Irregular</span>
+									<?php else: ?>
+										<span class="badge badge-success ml-2">Regular</span>
+									<?php endif; ?>
+								</td>
+								<td>
+									<?php 
+									if($row['student_type'] == 'irregular') {
+										// For irregular students, get class list from CSV
+										$class_list = explode(',', $row['class']);
+										echo '<div class="class-list">';
+										foreach($class_list as $class) {
+											echo '<div class="class-list-item">' . trim($class) . '</div>';
+										}
+										echo '</div>';
+									} else {
+										echo $row['class'];
+									}
+									?>
+								</td>
 								<td><?php echo ucwords($row['faculty_name']) ?></td>
 								<td><?php echo $row['subject_code'] . ' - ' . $row['subject'] ?></td>
 								<td><span class="badge badge-warning">Pending</span></td>
@@ -291,14 +351,14 @@ did
 							<thead>
 								<tr class="bg-primary">
 									<th><b><?php echo $crow['criteria'] ?></b></th>
-									<?php if($crow['type'] == 'checklist'): ?>
-									<th width="5%" class="text-center">1</th>
-									<th width="5%" class="text-center">2</th>
-									<th width="5%" class="text-center">3</th>
-									<th width="5%" class="text-center">4</th>
-									<th width="5%" class="text-center">5</th>
+									<?php if ($crow['type'] == 'checklist'): ?>
+										<th width="5%" class="text-center">1</th>
+										<th width="5%" class="text-center">2</th>
+										<th width="5%" class="text-center">3</th>
+										<th width="5%" class="text-center">4</th>
+										<th width="5%" class="text-center">5</th>
 									<?php else: ?>
-									<th width="60%" class="text-center">Comments</th>
+										<th width="60%" class="text-center">Comments</th>
 									<?php endif; ?>
 								</tr>
 							</thead>
@@ -312,7 +372,7 @@ did
 										<td class="p-1" width="40%">
 											<?php echo $row['question'] ?>
 										</td>
-										<?php if($crow['type'] == 'checklist'): ?>
+										<?php if ($crow['type'] == 'checklist'): ?>
 											<?php for ($c = 1; $c <= 5; $c++): ?>
 												<td class="text-center">
 													<span class="rate_<?php echo $c . '_' . $row['id'] ?> rates"></span>
@@ -377,30 +437,30 @@ did
 			load_class()
 
 		// Add loading overlay when sending reminders
-		$('a[href="admin/send_reminders.php"]').click(function(e) {
+		$('a[href="admin/send_reminders.php"]').click(function (e) {
 			e.preventDefault();
 			var href = $(this).attr('href');
-			
+
 			// Show loading overlay
 			$('body').append('<div id="loading-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; justify-content: center; align-items: center;"><div style="background: white; padding: 20px; border-radius: 5px; text-align: center;"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Sending reminders, please wait...</div></div>');
-			
+
 			// Disable all clickable elements
 			$('a, button').css('pointer-events', 'none');
-			
+
 			// Remove the beforeunload handler before navigation
 			$(window).off('beforeunload');
-			
+
 			// Navigate to send_reminders.php
 			window.location.href = href;
 		});
 
 		// Handle navigation warning only when loading overlay is not present
-		$(window).on('beforeunload', function(e) {
-			if($('#loading-overlay').length > 0) {
+		$(window).on('beforeunload', function (e) {
+			if ($('#loading-overlay').length > 0) {
 				return;
 			}
 			// Only show warning if there are unsaved changes
-			if($('form').length > 0 && $('form').serialize() !== $('form').data('original-state')) {
+			if ($('form').length > 0 && $('form').serialize() !== $('form').data('original-state')) {
 				return "Changes you made may not be saved.";
 			}
 		});
@@ -430,7 +490,6 @@ did
 						Object.keys(resp).map(k => {
 							$('#class-list').append('<a href="javascript:void(0)" data-json=\'' + JSON.stringify(resp[k]) + '\' data-id="' + resp[k].id + '" class="list-group-item list-group-item-action show-result">' + resp[k].class + ' - ' + resp[k].subj + '</a>')
 						})
-
 					}
 				}
 			},
@@ -466,7 +525,7 @@ did
 	function load_report($faculty_id, $subject_id, $class_id) {
 		if ($('#preloader2').length <= 0)
 			start_load()
-		console.log('Loading report for:', {faculty_id: $faculty_id, subject_id: $subject_id, class_id: $class_id});
+		console.log('Loading report for:', { faculty_id: $faculty_id, subject_id: $subject_id, class_id: $class_id });
 		$.ajax({
 			url: './ajax.php?action=get_report',
 			method: "POST",
@@ -490,7 +549,7 @@ did
 						$('#tse').text(resp.tse)
 						$('.rates').text('-')
 						$('.comments-list').html('')
-						
+
 						// Handle checklist ratings
 						var data = resp.data
 						Object.keys(data).map(q => {
@@ -499,13 +558,13 @@ did
 								$('.rate_' + r + '_' + q).text(data[q][r] + '%')
 							})
 						})
-						
+
 						// Handle comments
-						if(resp.comments) {
+						if (resp.comments) {
 							Object.keys(resp.comments).map(q => {
 								var commentsHtml = '<ul class="list-unstyled mb-0">';
 								resp.comments[q].forEach(comment => {
-									if(comment && comment.trim() !== '') {
+									if (comment && comment.trim() !== '') {
 										commentsHtml += '<li class="mb-2">' + comment + '</li>';
 									}
 								});

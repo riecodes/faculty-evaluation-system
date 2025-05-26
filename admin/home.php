@@ -1,5 +1,7 @@
 <?php include('db_connect.php'); ?>
 <?php
+
+
 /**
  * Converts a number to its ordinal representation (1st, 2nd, 3rd, etc.)
  * Used for displaying semester numbers in a readable format

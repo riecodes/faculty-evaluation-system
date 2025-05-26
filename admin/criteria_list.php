@@ -80,6 +80,11 @@ endif;
 													</div>
 												</span>
 												<i class="fa fa-bars"></i> <?php echo ucwords($row['criteria']) ?>
+												<?php if($row['type'] == 'checklist'): ?>
+													<span class="badge badge-primary ml-2">5-1 Rating</span>
+												<?php else: ?>
+													<span class="badge badge-info ml-2">Text Comment</span>
+												<?php endif; ?>
 												<input type="hidden" name="criteria_id[]" value="<?php echo $row['id'] ?>">
 											</li>
 										<?php endforeach; ?>
@@ -108,6 +113,7 @@ endif;
 			var criteria = <?php echo json_encode($criteria); ?>;
 			$('#manage-criteria').find("[name='id']").val(criteria[id].id)
 			$('#manage-criteria').find("[name='criteria']").val(criteria[id].criteria)
+			$('#manage-criteria').find("[name='type']").val(criteria[id].type)
 			$('.type-group').hide()
 		})
 		$('#manage-criteria').on('reset', function () {

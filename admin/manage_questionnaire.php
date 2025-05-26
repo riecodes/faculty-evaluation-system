@@ -1,4 +1,5 @@
 <?php
+
 include 'db_connect.php';
 if (isset($_GET['id'])) {
 	$qry = $conn->query("SELECT * FROM academic_list where id = " . $_GET['id'])->fetch_array();
@@ -94,7 +95,7 @@ function ordinal_suffix($num)
 						<div class="form-group">
 							<label for="" class="font-weight-bold">Question</label>
 							<textarea name="question" id="question" cols="30" rows="4" class="form-control"
-								required=""><?php echo isset($question) ? $question : '' ?></textarea>
+								><?php echo isset($question) ? $question : '' ?></textarea>
 						</div>
 						<input type="hidden" name="type" id="question_type">
 					</form>
@@ -124,6 +125,14 @@ function ordinal_suffix($num)
 							<i class="fa fa-save"></i> Save Order
 						</button>
 					</div>
+				</div>
+				<!-- Debug Box -->
+				<div id="debug-box" class="alert alert-info mb-3">
+					<div class="d-flex justify-content-between align-items-center mb-2">
+						<h6 class="font-weight-bold mb-0">Debug Information:</h6>
+						<button class="btn btn-sm btn-outline-secondary" id="clear-debug">Clear</button>
+					</div>
+					<div id="debug-content"></div>
 				</div>
 				<div class="card-body">
 					<fieldset class="border border-info p-2 w-100 mb-4">
@@ -222,7 +231,7 @@ function ordinal_suffix($num)
 												<?php endfor; ?>
 											<?php else: ?>
 												<td colspan="5">
-													<textarea name="qid[<?php echo $row['id'] ?>]" class="form-control" rows="2" required></textarea>
+													<textarea name="qid[<?php echo $row['id'] ?>]" class="form-control" rows="2"></textarea>
 												</td>
 											<?php endif; ?>
 										</tr>
@@ -239,6 +248,18 @@ function ordinal_suffix($num)
 
 <script>
 	$(document).ready(function () {
+		// Load saved debug messages on page load
+		var savedMessages = localStorage.getItem('debugMessages');
+		if (savedMessages) {
+			$('#debug-content').html(savedMessages);
+		}
+		
+		// Clear debug messages button
+		$('#clear-debug').click(function() {
+			$('#debug-content').empty();
+			localStorage.removeItem('debugMessages');
+		});
+		
 		$('.select2').select2({
 			placeholder: "Please select here",
 			width: "100%"
@@ -251,6 +272,25 @@ function ordinal_suffix($num)
 			$('#question_type').val(criteriaType);
 		});
 	})
+	
+	// Function to update debug box
+	function updateDebugBox(message, isError = false) {
+		var debugBox = $('#debug-box');
+		var debugContent = $('#debug-content');
+		
+		debugBox.removeClass('alert-danger alert-info')
+			.addClass(isError ? 'alert-danger' : 'alert-info');
+		
+		var timestamp = new Date().toLocaleTimeString();
+		var newMessage = '<div class="mb-1">[' + timestamp + '] ' + message + '</div>';
+		
+		// Add new message to the top
+		debugContent.prepend(newMessage);
+		
+		// Save to localStorage
+		localStorage.setItem('debugMessages', debugContent.html());
+	}
+	
 	$('.edit_question').click(function () {
 		var id = $(this).attr('data-id')
 		var question = <?php echo json_encode($q_arr) ?>;
@@ -263,8 +303,42 @@ function ordinal_suffix($num)
 		_conf("Are you sure to delete this question?", "delete_question", [$(this).attr('data-id')])
 	})
 	$('#eval_restrict').click(function () {
-		uni_modal("Manage Evaluation Restrictions", "<?php echo $_SESSION['login_view_folder'] ?>manage_restriction.php?id=<?php echo $id ?>", "mid-large")
-	})
+		var academic_id = <?php echo isset($id) ? $id : 'null' ?>;
+		updateDebugBox('Opening restriction manager for academic_id: ' + academic_id);
+		
+		// Check if academic_id is valid
+		if (!academic_id) {
+			updateDebugBox('Error: Invalid academic_id', true);
+			return;
+		}
+		
+		// Check current restrictions before opening modal
+		$.ajax({
+			url: 'ajax.php?action=check_restrictions',
+			method: 'POST',
+			data: { academic_id: academic_id },
+			success: function(resp) {
+				try {
+					var data = JSON.parse(resp);
+					updateDebugBox('Current restrictions: ' + JSON.stringify(data, null, 2));
+				} catch(e) {
+					updateDebugBox('Error parsing restrictions data: ' + e.message, true);
+				}
+			},
+			error: function(xhr, status, error) {
+				updateDebugBox('Error checking restrictions: ' + error, true);
+			}
+		});
+		
+		uni_modal("Manage Evaluation Restrictions", "<?php echo $_SESSION['login_view_folder'] ?>manage_restriction.php?id=<?php echo $id ?>", "mid-large");
+	});
+	
+	// Listen for messages from the restriction modal
+	window.addEventListener('message', function(event) {
+		if (event.data && event.data.type === 'restriction_update') {
+			updateDebugBox('Restriction update received: ' + JSON.stringify(event.data, null, 2));
+		}
+	});
 	$('.tr-sortable').sortable()
 	$('#manage-question').on('reset', function () {
 		$(this).find('input[name="id"]').val('')
@@ -278,6 +352,11 @@ function ordinal_suffix($num)
 			end_load();
 			return false;
 		}
+		// Ensure type is set from criteria before submitting
+		var selectedOption = $('#criteria_id').find('option:selected');
+		var criteriaType = selectedOption.data('type');
+		$('#question_type').val(criteriaType);
+		
 		$.ajax({
 			url: 'ajax.php?action=save_question',
 			data: new FormData($(this)[0]),
@@ -289,6 +368,7 @@ function ordinal_suffix($num)
 			success: function (resp) {
 				if (resp == 1) {
 					alert_toast('Data successfully saved', "success");
+					updateDebugBox('Question saved successfully');
 					setTimeout(function () {
 						location.reload()
 					}, 1500)
@@ -299,9 +379,21 @@ function ordinal_suffix($num)
 	$('#order-question').submit(function (e) {
 		e.preventDefault()
 		start_load()
+		var formData = new FormData(this);
+		
+		// Get the order of questions within each criteria
+		$('.tr-sortable').each(function(criteriaIndex) {
+			$(this).find('tr').each(function(questionIndex) {
+				var qid = $(this).find('input[name="qid[]"]').val();
+				if(qid) {
+					formData.append('order[' + qid + ']', questionIndex);
+				}
+			});
+		});
+
 		$.ajax({
 			url: 'ajax.php?action=save_question_order',
-			data: new FormData($(this)[0]),
+			data: formData,
 			cache: false,
 			contentType: false,
 			processData: false,
@@ -311,7 +403,14 @@ function ordinal_suffix($num)
 				if (resp == 1) {
 					alert_toast('Order successfully saved', "success");
 					end_load()
+				} else {
+					alert_toast('Error saving order', "error");
+					end_load()
 				}
+			},
+			error: function(xhr, status, error) {
+				alert_toast('Error: ' + error, "error");
+				end_load()
 			}
 		})
 	})

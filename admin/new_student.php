@@ -33,6 +33,13 @@
 							</select>
 						</div>
 						<div class="form-group">
+							<label for="" class="control-label">Student Type</label>
+							<select name="type" id="type" class="form-control form-control-sm">
+								<option value="regular" <?php echo isset($type) && $type == 'regular' ? "selected" : "" ?>>Regular</option>
+								<option value="irregular" <?php echo isset($type) && $type == 'irregular' ? "selected" : "" ?>>Irregular</option>
+							</select>
+						</div>
+						<div class="form-group">
 							<label for="" class="control-label">Avatar</label>
 							<div class="custom-file">
 		                      <input type="file" class="custom-file-input" id="customFile" name="img" onchange="displayImg(this,$(this))">

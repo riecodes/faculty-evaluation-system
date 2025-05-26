@@ -490,12 +490,16 @@ class Action
     {
         extract($_POST);
         $data = "";
-        foreach ($qid as $k => $v) {
-            $update[] = $this->db->query("UPDATE question_list set order_by = $k where id = $v");
-        }
-        if (isset($update) && count($update)) {
+        if(isset($_POST['order']) && is_array($_POST['order'])) {
+            foreach($_POST['order'] as $qid => $order) {
+                $update = $this->db->query("UPDATE question_list set order_by = $order where id = $qid");
+                if(!$update) {
+                    return 0;
+                }
+            }
             return 1;
         }
+        return 0;
     }
     function save_faculty()
     {
@@ -665,70 +669,244 @@ class Action
     function save_restriction()
     {
         extract($_POST);
-        // Delete all restrictions for this academic_id
-        $this->db->query("DELETE FROM restriction_list where academic_id = $academic_id");
+        $data = "";
+        $academic_id = $this->db->real_escape_string($academic_id);
         
-        // If there are no restrictions to save, we're done
-        if(empty($rid) || !is_array($rid)) {
-            return 1;
-        }
+        // Start transaction
+        $this->db->query("START TRANSACTION");
         
-        // Save new restrictions
-        foreach ($rid as $k => $v) {
-            $data = " academic_id = $academic_id ";
-            $data .= ", faculty_id = {$faculty_id[$k]} ";
-            $data .= ", class_id = {$class_id[$k]} ";
-            $data .= ", subject_id = {$subject_id[$k]} ";
-            if (empty($v)) {
-                $save[] = $this->db->query("INSERT INTO restriction_list set $data ");
-            } else {
-                $save[] = $this->db->query("UPDATE restriction_list set $data where id = $v ");
+        try {
+            // Get existing restrictions for this academic year
+            $existing = array();
+            $qry = $this->db->query("SELECT id, faculty_id, class_id, subject_id, type FROM restriction_list WHERE academic_id = {$academic_id}");
+            while($row = $qry->fetch_assoc()) {
+                $key = $row['faculty_id'] . '_' . $row['class_id'] . '_' . $row['subject_id'] . '_' . $row['type'];
+                $existing[$key] = $row['id'];
             }
+            
+            // Process submitted restrictions
+            $submitted = array();
+            if(isset($faculty_id) && is_array($faculty_id)) {
+                foreach($faculty_id as $k => $v) {
+                    $faculty_id[$k] = $this->db->real_escape_string($v);
+                    $class_id[$k] = $this->db->real_escape_string($class_id[$k]);
+                    $subject_id[$k] = $this->db->real_escape_string($subject_id[$k]);
+                    $rid[$k] = $this->db->real_escape_string($rid[$k]);
+                    $type = isset($type[$k]) ? $this->db->real_escape_string($type[$k]) : 'regular';
+                    
+                    $key = $faculty_id[$k] . '_' . $class_id[$k] . '_' . $subject_id[$k] . '_' . $type;
+                    
+                    // Check if this combination already exists (excluding current restriction if editing)
+                    if(isset($existing[$key]) && $existing[$key] != $rid[$k]) {
+                        throw new Exception("Duplicate faculty-subject-class combination found");
+                    }
+                    
+                    $submitted[$key] = $rid[$k];
+                }
+            }
+            
+            // Delete restrictions that are no longer in the list
+            foreach($existing as $key => $id) {
+                if(!isset($submitted[$key])) {
+                    $this->db->query("DELETE FROM restriction_list WHERE id = {$id}");
+                }
+            }
+            
+            // Insert or update restrictions
+            if(isset($faculty_id) && is_array($faculty_id)) {
+                foreach($faculty_id as $k => $v) {
+                    if(empty($rid[$k])) {
+                        // New restriction
+                        $data = " academic_id = '{$academic_id}' ";
+                        $data .= ", faculty_id = '{$faculty_id[$k]}' ";
+                        $data .= ", class_id = '{$class_id[$k]}' ";
+                        $data .= ", subject_id = '{$subject_id[$k]}' ";
+                        $data .= ", type = '{$type}' ";
+                        
+                        $save = $this->db->query("INSERT INTO restriction_list set ".$data);
+                        if(!$save) {
+                            throw new Exception("Error saving new restriction");
+                        }
+                    }
+                }
+            }
+            
+            // Commit transaction
+            $this->db->query("COMMIT");
+            return 1;
+            
+        } catch (Exception $e) {
+            // Rollback transaction on error
+            $this->db->query("ROLLBACK");
+            return 2;
         }
-        return 1;
     }
-    function save_evaluation()
-    {
+    function save_evaluation() {
         extract($_POST);
+        
+        $debug_info = array();
+        $debug_info[] = "POST data: " . print_r($_POST, true);
+        $debug_info[] = "Rate array: " . print_r($rate, true);
+        
         $data = " student_id = {$_SESSION['login_id']} ";
         $data .= ", academic_id = $academic_id ";
         $data .= ", subject_id = $subject_id ";
         $data .= ", class_id = $class_id ";
-        $data .= ", restriction_id = $restriction_id ";
         $data .= ", faculty_id = $faculty_id ";
-        $save = $this->db->query("INSERT INTO evaluation_list set $data");
-        if ($save) {
-            $eid = $this->db->insert_id;
-            foreach ($qid as $k => $v) {
-                $data = " evaluation_id = $eid ";
-                $data .= ", question_id = $v ";
-                // Get question type
-                $qtype = $this->db->query("SELECT type FROM question_list WHERE id = $v")->fetch_array()['type'];
-                if($qtype == 'checklist') {
-                $data .= ", rate = {$rate[$v]} ";
-                    $data .= ", comment = NULL ";
+        
+        // Check if student is irregular
+        $student_type = $this->db->query("SELECT type FROM student_list WHERE id = {$_SESSION['login_id']}")->fetch_assoc()['type'];
+        $is_irregular = ($student_type == 'irregular');
+        
+        // Check if evaluation already exists
+        $chk = $this->db->query("SELECT * FROM evaluation_list 
+            WHERE academic_id = $academic_id 
+            AND student_id = {$_SESSION['login_id']} 
+            AND faculty_id = $faculty_id 
+            AND subject_id = $subject_id 
+            AND class_id = $class_id");
+        
+        if($chk->num_rows > 0) {
+            return "You have already evaluated this faculty for this subject.";
+        }
+        
+        // Begin transaction
+        $this->db->query("START TRANSACTION");
+        
+        try {
+            // For irregular students, check if restriction exists first
+            if($is_irregular) {
+                $restriction_check = $this->db->query("SELECT id FROM restriction_list 
+                    WHERE academic_id = $academic_id 
+                    AND faculty_id = $faculty_id 
+                    AND subject_id = $subject_id 
+                    AND class_id = $class_id 
+                    AND type = 'irregular'");
+                
+                if($restriction_check->num_rows > 0) {
+                    $restriction_id = $restriction_check->fetch_assoc()['id'];
+                    // Update student_id for existing restriction
+                    $this->db->query("UPDATE restriction_list SET student_id = {$_SESSION['login_id']} WHERE id = $restriction_id");
                 } else {
-                    $data .= ", rate = 0 "; // Set rate to 0 for textfield responses instead of NULL
-                    $comment = $this->db->real_escape_string($rate[$v]); // Properly escape the comment text
-                    $data .= ", comment = '$comment' "; // Store textfield response in comment field
+                    // Create new restriction entry
+                    $restriction_data = " academic_id = $academic_id ";
+                    $restriction_data .= ", faculty_id = $faculty_id ";
+                    $restriction_data .= ", subject_id = $subject_id ";
+                    $restriction_data .= ", class_id = $class_id ";
+                    $restriction_data .= ", type = 'irregular'";
+                    $restriction_data .= ", student_id = {$_SESSION['login_id']}";
+                    
+                    $save_restriction = $this->db->query("INSERT INTO restriction_list SET " . $restriction_data);
+                    
+                    if(!$save_restriction) {
+                        throw new Exception("Error creating restriction entry");
+                    }
+                    
+                    $restriction_id = $this->db->insert_id;
                 }
-                $ins[] = $this->db->query("INSERT INTO evaluation_answers set $data");
+            } else {
+                // For regular students, get the existing restriction
+                $restriction_check = $this->db->query("SELECT id FROM restriction_list 
+                    WHERE academic_id = $academic_id 
+                    AND faculty_id = $faculty_id 
+                    AND subject_id = $subject_id 
+                    AND class_id = $class_id 
+                    AND type = 'regular'");
+                
+                if($restriction_check->num_rows > 0) {
+                    $restriction_id = $restriction_check->fetch_assoc()['id'];
+                } else {
+                    throw new Exception("No valid restriction found for regular student");
+                }
             }
-            if (isset($ins)) {
-                return 1;
+            
+            $data .= ", restriction_id = $restriction_id ";
+            $save = $this->db->query("INSERT INTO evaluation_list set $data");
+            
+            if ($save) {
+                $eid = $this->db->insert_id;
+                foreach ($qid as $k => $v) {
+                    $data = " evaluation_id = $eid ";
+                    $data .= ", question_id = $v ";
+                    
+                    // Get question type
+                    $qtype = $this->db->query("SELECT type FROM question_list WHERE id = $v")->fetch_array()['type'];
+                    
+                    // Debug info
+                    $debug_info[] = "Processing question $v of type $qtype";
+                    $debug_info[] = "Rate data for question $v: " . print_r($rate[$v], true);
+                    
+                    if($qtype == 'checklist') {
+                        $data .= ", rate = {$rate[$v]} ";
+                        $data .= ", comment = NULL ";
+                    } else if($qtype == 'textfield') {
+                        // For textfield type, keep rate as 0 and set the comment
+                        $data .= ", rate = 0 ";
+                        
+                        // Get the comment text from the rate array
+                        $comment_text = isset($rate[$v]) ? trim($rate[$v]) : '';
+                        
+                        // Debug info
+                        $debug_info[] = "Comment text for question $v: " . $comment_text;
+                        
+                        if(!empty($comment_text)) {
+                            $comment = $this->db->real_escape_string($comment_text);
+                            $data .= ", comment = '$comment' ";
+                            $debug_info[] = "Setting comment for question $v to: " . $comment;
+                        } else {
+                            $data .= ", comment = NULL ";
+                            $debug_info[] = "No comment text for question $v";
+                        }
+                    }
+                    
+                    // Debug info
+                    $debug_info[] = "SQL for question $v: INSERT INTO evaluation_answers set $data";
+                    
+                    $ins[] = $this->db->query("INSERT INTO evaluation_answers set $data");
+                    
+                    // Debug info for any database errors
+                    if($this->db->error) {
+                        $debug_info[] = "Database error for question $v: " . $this->db->error;
+                    }
+                }
+                
+                if (isset($ins)) {
+                    $this->db->query("COMMIT");
+                    return json_encode(array(
+                        'status' => 1,
+                        'debug' => implode("\n", $debug_info)
+                    ));
+                }
             }
+            
+            throw new Exception("Error saving evaluation");
+            
+        } catch (Exception $e) {
+            $this->db->query("ROLLBACK");
+            $debug_info[] = "Error in save_evaluation: " . $e->getMessage();
+            return json_encode(array(
+                'status' => 0,
+                'error' => $e->getMessage(),
+                'debug' => implode("\n", $debug_info)
+            ));
         }
     }
     function get_class()
     {
         extract($_POST);
         $data = array();
-        $get = $this->db->query("SELECT c.id,concat(c.curriculum,' ',c.level,' - ',c.section) as class,s.id as sid,concat(s.code,' - ',s.subject) as subj FROM restriction_list r inner join class_list c on c.id = r.class_id inner join subject_list s on s.id = r.subject_id where r.faculty_id = {$fid} and academic_id = {$_SESSION['academic']['id']} ");
+        $get = $this->db->query("SELECT DISTINCT c.id, concat(c.curriculum,' ',c.level,' - ',c.section) as class, 
+            s.id as sid, concat(s.code,' - ',s.subject) as subj 
+            FROM restriction_list r 
+            INNER JOIN class_list c ON c.id = r.class_id 
+            INNER JOIN subject_list s ON s.id = r.subject_id 
+            WHERE r.faculty_id = {$fid} 
+            AND r.academic_id = {$_SESSION['academic']['id']}
+            GROUP BY c.id, s.id");
         while ($row = $get->fetch_assoc()) {
             $data[] = $row;
         }
         return json_encode($data);
-
     }
     function get_report()
     {
@@ -1009,5 +1187,121 @@ class Action
             }
         }
         return $data;
+    }
+
+    function get_faculty_subjects() {
+        extract($_POST);
+        $data = array();
+        
+        // Validate faculty_id
+        if(!isset($faculty_id) || empty($faculty_id)) {
+            return json_encode(['error' => 'Faculty ID is required']);
+        }
+        
+        // Sanitize faculty_id
+        $faculty_id = $this->db->real_escape_string($faculty_id);
+        
+        try {
+            // Validate academic_id session
+            if(!isset($_SESSION['academic']['id'])) {
+                throw new Exception('Academic session not found');
+            }
+            
+            $academic_id = $this->db->real_escape_string($_SESSION['academic']['id']);
+            
+            // Modified query to get all subjects
+            $get = $this->db->query("SELECT DISTINCT s.id, s.code, s.subject 
+                FROM subject_list s 
+                ORDER BY s.code");
+                
+            if(!$get) {
+                throw new Exception($this->db->error);
+            }
+            
+            while ($row = $get->fetch_assoc()) {
+                $data[] = $row;
+            }
+            
+            return json_encode($data);
+            
+        } catch (Exception $e) {
+            error_log("Error in get_faculty_subjects: " . $e->getMessage());
+            return json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
+    function get_faculty_sections() {
+        extract($_POST);
+        $data = array();
+        
+        try {
+            // Log the incoming request
+            error_log("get_faculty_sections called with POST data: " . print_r($_POST, true));
+            
+            // Validate academic_id session
+            if(!isset($_SESSION['academic']['id'])) {
+                throw new Exception('Academic session not found');
+            }
+            
+            // Validate subject_id
+            if(!isset($subject_id) || empty($subject_id)) {
+                throw new Exception('Subject ID is required');
+            }
+            
+            $academic_id = $this->db->real_escape_string($_SESSION['academic']['id']);
+            $subject_id = $this->db->real_escape_string($subject_id);
+            
+            // Get sections from class_list
+            $query = "SELECT DISTINCT c.id, concat(c.curriculum,' ',c.level,' - ',c.section) as class 
+                FROM class_list c 
+                ORDER BY c.curriculum, c.level, c.section";
+            
+            error_log("Executing query: " . $query);
+            
+            $get = $this->db->query($query);
+                
+            if(!$get) {
+                throw new Exception("Database error: " . $this->db->error);
+            }
+            
+            while ($row = $get->fetch_assoc()) {
+                $data[] = $row;
+            }
+            
+            error_log("Query returned " . count($data) . " results");
+            
+            // Ensure we return a valid JSON response even if no data
+            if(empty($data)) {
+                error_log("No sections found, returning empty array");
+                return json_encode(array());
+            }
+            
+            $response = json_encode($data);
+            error_log("Returning response: " . $response);
+            return $response;
+            
+        } catch (Exception $e) {
+            error_log("Error in get_faculty_sections: " . $e->getMessage());
+            return json_encode(array('error' => $e->getMessage()));
+        }
+    }
+
+    function check_evaluation() {
+        extract($_POST);
+        $check = $this->db->query("SELECT * FROM evaluation_list 
+            WHERE academic_id = {$_SESSION['academic']['id']} 
+            AND student_id = {$_SESSION['login_id']} 
+            AND faculty_id = {$faculty_id} 
+            AND subject_id = {$subject_id} 
+            AND class_id = {$class_id}");
+        return $check->num_rows > 0 ? 1 : 0;
+    }
+
+    function delete_restriction()
+    {
+        extract($_POST);
+        $delete = $this->db->query("DELETE FROM restriction_list where id = ".$id);
+        if($delete)
+            return 1;
     }
 }

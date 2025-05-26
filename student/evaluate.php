@@ -1,19 +1,5 @@
 <?php
-function ordinal_suffix($num)
-{
-	$num = $num % 100; // protect against large numbers
-	if ($num < 11 || $num > 13) {
-		switch ($num % 10) {
-			case 1:
-				return $num . 'st';
-			case 2:
-				return $num . 'nd';
-			case 3:
-				return $num . 'rd';
-		}
-	}
-	return $num . 'th';
-}
+require_once 'includes/functions.php';
 
 // Check if student is irregular
 $student_type = $conn->query("SELECT type FROM student_list WHERE id = {$_SESSION['login_id']}")->fetch_assoc()['type'];
@@ -35,18 +21,23 @@ if (isset($_GET['cid']))
 
 // Get restrictions based on student type
 if ($is_irregular) {
-    // For irregular students, get all active faculty and subjects
-    $faculty_list = $conn->query("SELECT id, avatar, concat(firstname,' ',lastname) as faculty FROM faculty_list WHERE status = 1 ORDER BY lastname, firstname");
-    $subject_list = $conn->query("SELECT id, code, subject FROM subject_list ORDER BY code");
-    $class_list = $conn->query("SELECT id, concat(curriculum,' ',level,' - ',section) as class_name FROM class_list ORDER BY curriculum, level, section");
+    // For irregular students, get all active faculty
+    $faculty_list = $conn->query("SELECT id, avatar, concat(firstname,' ',lastname) as faculty 
+        FROM faculty_list 
+        WHERE status = 1 
+        ORDER BY lastname, firstname");
 } else {
     // For regular students, get restrictions as before
-    $restriction = $conn->query("SELECT r.id,s.id as sid,f.id as fid,f.avatar,concat(f.firstname,' ',f.lastname) as faculty,s.code,s.subject 
+    $restriction = $conn->query("SELECT r.id, s.id as sid, f.id as fid, f.avatar, 
+        concat(f.firstname,' ',f.lastname) as faculty, s.code, s.subject, r.type,
+        concat(c.curriculum,' ',c.level,' - ',c.section) as class
         FROM restriction_list r 
         inner join faculty_list f on f.id = r.faculty_id 
         inner join subject_list s on s.id = r.subject_id 
+        inner join class_list c on c.id = r.class_id
         where academic_id ={$_SESSION['academic']['id']} 
         and class_id = {$_SESSION['login_class_id']} 
+        and r.type = 'regular'
         and r.id not in (
             SELECT restriction_id from evaluation_list 
             where academic_id ={$_SESSION['academic']['id']} 
@@ -81,6 +72,9 @@ if ($is_irregular) {
 .faculty-card.active small.text-muted {
     color: rgba(255,255,255,0.8) !important;
 }
+.select2-container {
+    width: 100% !important;
+}
 </style>
 
 <!-- Owl Carousel JS -->
@@ -101,7 +95,7 @@ if ($is_irregular) {
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label for="faculty">Faculty</label>
-                                    <select class="form-control" id="faculty" name="faculty_id" required>
+                                    <select class="form-control select2" id="faculty" name="faculty_id" required>
                                         <option value="">Select Faculty</option>
                                         <?php while($row = $faculty_list->fetch_assoc()): ?>
                                             <option value="<?php echo $row['id'] ?>" <?php echo $faculty_id == $row['id'] ? 'selected' : '' ?>>
@@ -114,32 +108,23 @@ if ($is_irregular) {
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label for="subject">Subject</label>
-                                    <select class="form-control" id="subject" name="subject_id" required>
+                                    <select class="form-control select2" id="subject" name="subject_id" required disabled>
                                         <option value="">Select Subject</option>
-                                        <?php while($row = $subject_list->fetch_assoc()): ?>
-                                            <option value="<?php echo $row['id'] ?>" <?php echo $subject_id == $row['id'] ? 'selected' : '' ?>>
-                                                <?php echo $row['code'] . ' - ' . $row['subject'] ?>
-                                            </option>
-                                        <?php endwhile; ?>
                                     </select>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label for="class">Section</label>
-                                    <select class="form-control" id="class" name="class_id" required>
+                                    <select class="form-control select2" id="class" name="class_id" required disabled>
                                         <option value="">Select Section</option>
-                                        <?php while($row = $class_list->fetch_assoc()): ?>
-                                            <option value="<?php echo $row['id'] ?>" <?php echo $class_id == $row['id'] ? 'selected' : '' ?>>
-                                                <?php echo $row['class_name'] ?>
-                                            </option>
-                                        <?php endwhile; ?>
                                     </select>
                                 </div>
                             </div>
                         </div>
+                        <div id="selection-error" class="alert alert-danger mt-3" style="display: none;"></div>
                         <div class="text-center mt-3">
-                            <button type="submit" class="btn btn-primary">Proceed to Evaluation</button>
+                            <button type="submit" class="btn btn-primary" id="proceed-btn" disabled>Proceed to Evaluation</button>
                         </div>
                     </form>
                 </div>
@@ -164,8 +149,8 @@ if ($is_irregular) {
 								</div>
 								
 									<h6 class="mb-1"><?php echo ucwords($row['faculty']) ?></h6>
-									<small class="text-muted"><?php echo $row["code"] ?></small><br>
-									<small class="text-muted"><?php echo $row['subject'] ?></small>
+									<small class="text-muted"><?php echo ucfirst($row['type']) ?> - <?php echo $row["code"] ?> - <?php echo $row['subject'] ?></small><br>
+									<small class="text-muted"><?php echo $row['class'] ?></small>
 								
 							</div>
 						</a>
@@ -273,6 +258,10 @@ if ($is_irregular) {
 												<?php endfor; ?>
 											<?php else: ?>
 												<td colspan="5">
+													<?php 
+													// Debug output
+													echo "<!-- Textfield for question ID: " . $row['id'] . " -->";
+													?>
 													<textarea name="rate[<?php echo $row['id'] ?>]" class="form-control" rows="2" required></textarea>
 												</td>
 											<?php endif; ?>
@@ -282,6 +271,16 @@ if ($is_irregular) {
 							</table>
 						<?php endwhile; ?>
 					</form>
+					
+					<!-- Debug Box -->
+					<div id="debug-box" class="card mt-3" style="display: none;">
+						<div class="card-header bg-dark text-white">
+							<h5 class="mb-0">Debug Information</h5>
+						</div>
+						<div class="card-body">
+							<pre id="debug-content" class="mb-0" style="white-space: pre-wrap;"></pre>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -317,9 +316,186 @@ if ($is_irregular) {
 				}
 			}
 		});
-		<?php endif; ?>
+		<?php else: ?>
+		// Initialize select2 for irregular students
+		$('.select2').select2({
+			placeholder: "Please select here",
+			width: "100%"
+		});
 
-		// Handle irregular student selection form
+		// Handle faculty selection
+		$('#faculty').change(function() {
+			var facultyId = $(this).val();
+			if(facultyId) {
+				// Enable and load subjects
+				$('#subject').prop('disabled', false).html('<option value="">Loading...</option>');
+				$('#class').prop('disabled', true).html('<option value="">Select Section</option>');
+				$('#proceed-btn').prop('disabled', true);
+				
+				console.log('Fetching subjects for faculty:', facultyId);
+				
+				$.ajax({
+					url: 'ajax.php?action=get_faculty_subjects',
+					method: 'POST',
+					data: {faculty_id: facultyId},
+					dataType: 'json',
+					success: function(data) {
+						console.log('Received response:', data);
+						
+						// Check for error response
+						if(data.error) {
+							console.error('Server returned error:', data.error);
+							$('#selection-error').html(data.error).show();
+							$('#subject').prop('disabled', true).html('<option value="">Select Subject</option>');
+							return;
+						}
+						
+						var options = '<option value="">Select Subject</option>';
+						if(data && data.length > 0) {
+							data.forEach(function(item) {
+								options += '<option value="' + item.id + '">' + item.code + ' - ' + item.subject + '</option>';
+							});
+						} else {
+							console.log('No subjects found for faculty');
+							$('#selection-error').html('No subjects found for this faculty').show();
+						}
+						$('#subject').html(options);
+						$('#selection-error').hide();
+					},
+					error: function(xhr, status, error) {
+						console.error('AJAX Error:', error);
+						console.error('Status:', status);
+						console.error('Response:', xhr.responseText);
+						console.error('Status Code:', xhr.status);
+						
+						var errorMsg = 'Error loading subjects. ';
+						if(xhr.status === 0) {
+							errorMsg += 'No response from server.';
+						} else if(xhr.status === 404) {
+							errorMsg += 'Requested page not found.';
+						} else if(xhr.status === 500) {
+							errorMsg += 'Internal server error.';
+						} else {
+							errorMsg += 'Please try again.';
+						}
+						
+						$('#selection-error').html(errorMsg).show();
+						$('#subject').prop('disabled', true).html('<option value="">Select Subject</option>');
+					}
+				});
+			} else {
+				$('#subject').prop('disabled', true).html('<option value="">Select Subject</option>');
+				$('#class').prop('disabled', true).html('<option value="">Select Section</option>');
+				$('#proceed-btn').prop('disabled', true);
+				$('#selection-error').hide();
+			}
+		});
+
+		// Handle subject selection
+		$('#subject').change(function() {
+			var facultyId = $('#faculty').val();
+			var subjectId = $(this).val();
+			if(facultyId && subjectId) {
+				// Enable and load sections
+				$('#class').prop('disabled', false).html('<option value="">Loading...</option>');
+				$('#proceed-btn').prop('disabled', true);
+				
+				console.log('Fetching sections for faculty:', facultyId, 'and subject:', subjectId);
+				
+				$.ajax({
+					url: 'ajax.php?action=get_faculty_sections',
+					method: 'POST',
+					data: {
+						faculty_id: facultyId,
+						subject_id: subjectId
+					},
+					dataType: 'json',
+					success: function(data) {
+						console.log('Received sections response:', data);
+						
+						// Check for error response
+						if(data.error) {
+							console.error('Server returned error:', data.error);
+							$('#selection-error').html(data.error).show();
+							$('#class').prop('disabled', true).html('<option value="">Select Section</option>');
+							return;
+						}
+						
+						var options = '<option value="">Select Section</option>';
+						if(data && data.length > 0) {
+							data.forEach(function(item) {
+								options += '<option value="' + item.id + '">' + item.class + '</option>';
+							});
+						} else {
+							console.log('No sections found');
+							$('#selection-error').html('No sections found for this subject').show();
+						}
+						$('#class').html(options);
+						$('#selection-error').hide();
+					},
+					error: function(xhr, status, error) {
+						console.error('AJAX Error:', error);
+						console.error('Status:', status);
+						console.error('Response:', xhr.responseText);
+						console.error('Status Code:', xhr.status);
+						
+						var errorMsg = 'Error loading sections. ';
+						if(xhr.status === 0) {
+							errorMsg += 'No response from server.';
+						} else if(xhr.status === 404) {
+							errorMsg += 'Requested page not found.';
+						} else if(xhr.status === 500) {
+							errorMsg += 'Internal server error.';
+						} else {
+							errorMsg += 'Please try again.';
+						}
+						
+						$('#selection-error').html(errorMsg).show();
+						$('#class').prop('disabled', true).html('<option value="">Select Section</option>');
+					}
+				});
+			} else {
+				$('#class').prop('disabled', true).html('<option value="">Select Section</option>');
+				$('#proceed-btn').prop('disabled', true);
+			}
+		});
+
+		// Handle section selection
+		$('#class').change(function() {
+			var facultyId = $('#faculty').val();
+			var subjectId = $('#subject').val();
+			var classId = $(this).val();
+			
+			if(facultyId && subjectId && classId) {
+				// Check if already evaluated
+				$.ajax({
+					url: 'ajax.php?action=check_evaluation',
+					method: 'POST',
+					data: {
+						faculty_id: facultyId,
+						subject_id: subjectId,
+						class_id: classId
+					},
+					success: function(resp) {
+						if(resp == 1) {
+							$('#selection-error').html('You have already evaluated this faculty for this subject and section').show();
+							$('#proceed-btn').prop('disabled', true);
+						} else {
+							$('#selection-error').hide();
+							$('#proceed-btn').prop('disabled', false);
+						}
+					},
+					error: function() {
+						$('#selection-error').html('Error checking evaluation status').show();
+						$('#proceed-btn').prop('disabled', true);
+					}
+				});
+			} else {
+				$('#proceed-btn').prop('disabled', true);
+			}
+		});
+
+		// Handle form submission
 		$('#irregular-selection').submit(function(e) {
 			e.preventDefault();
 			var faculty = $('#faculty').val();
@@ -327,38 +503,83 @@ if ($is_irregular) {
 			var class_id = $('#class').val();
 			
 			if (faculty && subject && class_id) {
-				window.location.href = './index.php?page=evaluate&fid=' + faculty + '&sid=' + subject + '&cid=' + class_id;
+				// Disable all dropdowns
+				$('#faculty, #subject, #class').prop('disabled', true);
+				$('#proceed-btn').prop('disabled', true);
+				
+				// Show success message
+				$('#selection-error')
+					.removeClass('alert-danger')
+					.addClass('alert-success')
+					.html('Details saved! Please proceed with the evaluation below.')
+					.show();
+					
+				// Update hidden fields
+				$('input[name="faculty_id"]').val(faculty);
+				$('input[name="subject_id"]').val(subject);
+				$('input[name="class_id"]').val(class_id);
+				
+				// Scroll to evaluation form
+				$('html, body').animate({
+					scrollTop: $("#manage-evaluation").offset().top - 100
+				}, 500);
 			} else {
-				alert_toast("Please select all required fields", "error");
+				$('#selection-error')
+					.removeClass('alert-success')
+					.addClass('alert-danger')
+					.html('Please select all required fields')
+					.show();
 			}
 		});
+		<?php endif; ?>
 
 		if ('<?php echo $_SESSION['academic']['status'] ?>' == 0) {
 			uni_modal("Information", "<?php echo $_SESSION['login_view_folder'] ?>not_started.php")
 		} else if ('<?php echo $_SESSION['academic']['status'] ?>' == 2) {
 			uni_modal("Information", "<?php echo $_SESSION['login_view_folder'] ?>closed.php")
 		}
-		else if ('<?php echo $_SESSION['academic']['status'] ?>' == 2) {
-			uni_modal("Information", "<?php echo $_SESSION['login_view_folder'] ?>closed.php")
-		}
 		if (<?php echo empty($rid) && !$is_irregular ? 1 : 0 ?> == 1)
 			uni_modal("Information", "<?php echo $_SESSION['login_view_folder'] ?>done.php")
 	})
 	
+	// Function to update debug box
+	function updateDebugBox(message, isError = false) {
+		$('#debug-box').show();
+		var timestamp = new Date().toLocaleTimeString();
+		var content = $('#debug-content').html();
+		var newContent = '[' + timestamp + '] ' + message + '\n' + content;
+		$('#debug-content').html(newContent);
+		
+		if(isError) {
+			$('#debug-box .card-header').removeClass('bg-dark').addClass('bg-danger');
+		} else {
+			$('#debug-box .card-header').removeClass('bg-danger').addClass('bg-dark');
+		}
+	}
+
 	$('#manage-evaluation').submit(function(e) {
 		e.preventDefault();
 		start_load();
 		
-		// Validate form
-		var isValid = true;
+		var formData = $(this).serialize();
+		updateDebugBox('Form data being submitted: ' + formData);
+		
+		// Log each textfield value
+		$(this).find('textarea').each(function() {
+			updateDebugBox('Textfield ' + $(this).attr('name') + ' value: ' + $(this).val());
+		});
+		
+		// Validate required textfields
+		var hasEmptyFields = false;
 		$(this).find('textarea[required]').each(function() {
 			if (!$(this).val().trim()) {
-				isValid = false;
-				return false;
+				hasEmptyFields = true;
+				$(this).addClass('is-invalid');
 			}
 		});
 		
-		if (!isValid) {
+		if (hasEmptyFields) {
+			updateDebugBox('Error: Please fill in all required fields', true);
 			alert_toast("Please fill in all required fields", "error");
 			end_load();
 			return false;
@@ -369,17 +590,21 @@ if ($is_irregular) {
 			method: 'POST',
 			data: $(this).serialize(),
 			success: function (resp) {
+				updateDebugBox('Server response: ' + resp);
 				if (resp == 1) {
 					alert_toast("Evaluation submitted successfully.", "success");
 					setTimeout(function () {
 						location.reload();
 					}, 1750);
 				} else {
+					updateDebugBox('Error: ' + resp, true);
 					alert_toast("Error: " + resp, "error");
 					end_load();
 				}
 			},
 			error: function(xhr, status, error) {
+				var errorMsg = 'AJAX Error: ' + error + '\nStatus: ' + status + '\nResponse: ' + xhr.responseText;
+				updateDebugBox(errorMsg, true);
 				alert_toast("Error submitting evaluation. Please try again.", "error");
 				end_load();
 			}
