@@ -164,7 +164,18 @@ function ordinal_suffix($num)
 						$pending_query = $conn->query("SELECT 
 							s.id as student_id,
 							CONCAT(s.firstname, ' ', s.lastname) as student_name,
-							CONCAT(c.curriculum, ' ', c.level, '-', c.section) as class,
+							CASE 
+								WHEN s.type = 'regular' THEN CONCAT(c.curriculum, ' ', c.level, '-', c.section)
+								WHEN s.type = 'irregular' THEN (
+									SELECT GROUP_CONCAT(DISTINCT CONCAT(cl.curriculum, ' ', cl.level, '-', cl.section) SEPARATOR ', ')
+									FROM irregular_enrollments ie
+									JOIN class_list cl ON cl.id = ie.class_id
+									WHERE ie.student_id = s.id 
+									AND ie.academic_id = {$_SESSION['academic']['id']}
+									AND ie.faculty_id = f.id
+									AND ie.subject_id = sub.id
+								)
+							END as class,
 							CONCAT(f.firstname, ' ', f.lastname) as faculty_name,
 							sub.subject,
 							sub.code as subject_code,
@@ -213,11 +224,11 @@ function ordinal_suffix($num)
 								<td>
 									<?php 
 									if($row['student_type'] == 'irregular') {
-										// For irregular students, get class list from CSV
+										// For irregular students, get class list from the query result
 										$class_list = explode(',', $row['class']);
 										echo '<div class="class-list">';
 										foreach($class_list as $class) {
-											echo '<div class="class-list-item">' . trim($class) . '</div>';
+											echo trim($class) . '</div>';
 										}
 										echo '</div>';
 									} else {
@@ -244,7 +255,17 @@ function ordinal_suffix($num)
 				<select name="" id="faculty_id" class="form-control form-control-sm select2">
 					<option value=""></option>
 					<?php
-					$faculty = $conn->query("SELECT *,concat(firstname,' ',lastname) as name FROM faculty_list order by concat(firstname,' ',lastname) asc");
+					// Modified query to only get faculty with evaluation data
+					$faculty = $conn->query("SELECT DISTINCT f.*, concat(f.firstname,' ',f.lastname) as name 
+						FROM faculty_list f 
+						INNER JOIN restriction_list r ON r.faculty_id = f.id 
+						WHERE r.academic_id = {$_SESSION['academic']['id']}
+						AND EXISTS (
+							SELECT 1 FROM evaluation_list e 
+							WHERE e.faculty_id = f.id 
+							AND e.academic_id = {$_SESSION['academic']['id']}
+						)
+						ORDER BY concat(f.firstname,' ',f.lastname) asc");
 					$f_arr = array();
 					$fname = array();
 					while ($row = $faculty->fetch_assoc()):
@@ -282,7 +303,7 @@ function ordinal_suffix($num)
 			<div class="card shadow-sm border" id="printable">
 				<div class="card-body">
 					<div>
-						<h3 class="text-center text-primary">Evaluation Report</h3>
+						<h3 class="text-center m-0 font-weight-bold text-primary">Evaluation Report</h3>
 						<hr class="border-primary">
 						<table width="100%">
 							<tr>
@@ -376,8 +397,8 @@ function ordinal_suffix($num)
 								while ($row = $questions->fetch_assoc()):
 									$q_arr[$row['id']] = $row;
 									?>
-									<tr class="bg-white">
-										<td class="p-1" width="40%">
+									<tr>
+										<td class="p-1 align-middle" width="40%">
 											<?php echo $row['question'] ?>
 										</td>
 										<?php if ($crow['type'] == 'checklist'): ?>
@@ -437,9 +458,29 @@ function ordinal_suffix($num)
 <script>
 	$(document).ready(function () {
 		$('#faculty_id').change(function () {
-			if ($(this).val() > 0)
+			if ($(this).val() > 0) {
 				window.history.pushState({}, null, './index.php?page=report&fid=' + $(this).val());
-			load_class()
+				// Clear previous data
+				$('#fname').text('');
+				$('#classField').text('');
+				$('#subjectField').text('');
+				$('#tse').text('');
+				$('.rates').text('');
+				$('.comments-list').html('');
+				$('#print-btn').hide();
+				$('#class-list').html('');
+				load_class();
+			} else {
+				// Clear all data if no faculty selected
+				$('#fname').text('');
+				$('#classField').text('');
+				$('#subjectField').text('');
+				$('#tse').text('');
+				$('.rates').text('');
+				$('.comments-list').html('');
+				$('#print-btn').hide();
+				$('#class-list').html('<a href="javascript:void(0)" class="list-group-item list-group-item-action disabled">No data to be display.</a>');
+			}
 		})
 		if ($('#faculty_id').val() > 0)
 			load_class()
@@ -541,6 +582,11 @@ function ordinal_suffix($num)
 			error: function (err) {
 				console.log('Error loading report:', err);
 				alert_toast("An Error Occured.", "error");
+				// Clear data on error
+				$('.rates').text('');
+				$('.comments-list').html('');
+				$('#tse').text('');
+				$('#print-btn').hide();
 				end_load()
 			},
 			success: function (resp) {
@@ -558,22 +604,23 @@ function ordinal_suffix($num)
 						$('.rates').text('-')
 						$('.comments-list').html('')
 
-						// Handle checklist ratings
+						// Handle checklist ratings with 2 decimal places
 						var data = resp.data
 						Object.keys(data).map(q => {
 							Object.keys(data[q]).map(r => {
-								console.log($('.rate_' + r + '_' + q), data[q][r])
-								$('.rate_' + r + '_' + q).text(data[q][r] + '%')
+								var percentage = parseFloat(data[q][r]);
+								var formattedPercentage = percentage.toFixed(2) + '%';
+								$('.rate_' + r + '_' + q).text(formattedPercentage);
 							})
 						})
 
-						// Handle comments
+						// Handle comments with consistent styling
 						if (resp.comments) {
 							Object.keys(resp.comments).map(q => {
 								var commentsHtml = '<ul class="list-unstyled mb-0">';
 								resp.comments[q].forEach(comment => {
 									if (comment && comment.trim() !== '') {
-										commentsHtml += '<li class="mb-2">' + comment + '</li>';
+										commentsHtml += '<li class="mb-2 p-2 border-bottom">' + comment + '</li>';
 									}
 								});
 								commentsHtml += '</ul>';

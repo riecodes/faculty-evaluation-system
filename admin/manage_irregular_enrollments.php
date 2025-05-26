@@ -242,14 +242,14 @@ $(document).ready(function() {
             data: $(this).serialize(),
             dataType: 'json',
             success: function(resp) {
-                if(resp == 1) {
+                if(resp.status == 1) {
                     $('#enrollment_modal').modal('hide');
-                    alert_toast("Enrollment successfully saved", "success");
+                    alert_toast(resp.message || "Enrollment successfully saved", "success");
                     setTimeout(function() {
                         location.reload();
                     }, 1500);
                 } else {
-                    alert_toast("Error: " + (typeof resp === 'string' ? resp : 'Failed to save enrollment'), "error");
+                    alert_toast("Error: " + (resp.error || 'Failed to save enrollment'), "error");
                 }
             },
             error: function(xhr, status, error) {

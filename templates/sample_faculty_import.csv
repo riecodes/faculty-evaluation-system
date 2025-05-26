@@ -1,3 +1,4 @@
 school_id,firstname,lastname,email,password,status
-F2023001,Albert,Einstein,albert.einstein@example.com,Relativity123,1
-F2023002,Marie,Curie,marie.curie@example.com,Radioactivity456,1 
+F2023001,John,Doe,john@faculty.com,j,1
+F2023002,Jane,Smith,jane@faculty.com,j,1
+F2023003,Robert,Johnson,robert@faculty.com,r,1 

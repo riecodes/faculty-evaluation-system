@@ -3,6 +3,7 @@
 <div class="col-lg-12">
 	<div class="card">
 		<div class="card-body">			
+			<div id="bulkStudentFeedback"></div>			
 			<button class="btn btn-primary btn-sm mb-2" type="button" data-toggle="modal" data-target="#bulkStudentModal"><i class="fa fa-upload"></i> Bulk Account Creation</button>
 			<form action="" id="manage_student">
 				<input type="hidden" name="id" value="<?php echo isset($id) ? $id : '' ?>">
@@ -21,6 +22,13 @@
 							<input type="text" name="lastname" class="form-control form-control-sm" required value="<?php echo isset($lastname) ? $lastname : '' ?>">
 						</div>
 						<div class="form-group">
+							<label for="" class="control-label">Student Type</label>
+							<select name="type" id="type" class="form-control form-control-sm">
+								<option value="regular" <?php echo isset($type) && $type == 'regular' ? "selected" : "" ?>>Regular</option>
+								<option value="irregular" <?php echo isset($type) && $type == 'irregular' ? "selected" : "" ?>>Irregular</option>
+							</select>
+						</div>
+						<div class="form-group class-group" style="display: <?php echo isset($type) && $type == 'irregular' ? 'none' : 'block' ?>;">
 							<label for="" class="control-label">Class</label>
 							<select name="class_id" id="class_id" class="form-control form-control-sm select2">
 								<option value=""></option>
@@ -30,13 +38,6 @@
 								?>
 								<option value="<?php echo $row['id'] ?>" <?php echo isset($class_id) && $class_id == $row['id'] ? "selected" : "" ?>><?php echo $row['class'] ?></option>
 								<?php endwhile; ?>
-							</select>
-						</div>
-						<div class="form-group">
-							<label for="" class="control-label">Student Type</label>
-							<select name="type" id="type" class="form-control form-control-sm">
-								<option value="regular" <?php echo isset($type) && $type == 'regular' ? "selected" : "" ?>>Regular</option>
-								<option value="irregular" <?php echo isset($type) && $type == 'irregular' ? "selected" : "" ?>>Irregular</option>
 							</select>
 						</div>
 						<div class="form-group">
@@ -89,6 +90,7 @@
         </button>
       </div>
       <div class="modal-body">
+        <div id="bulkStudentFeedback"></div>
         <form id="bulkStudentForm" enctype="multipart/form-data">
           <div class="form-group">
             <label for="studentCSV">Upload CSV File</label>
@@ -126,6 +128,17 @@
 			}
 		}
 	})
+
+	// Handle class dropdown visibility based on student type
+	$('#type').change(function() {
+		if($(this).val() == 'irregular') {
+			$('.class-group').hide();
+			$('#class_id').val('').trigger('change');
+		} else {
+			$('.class-group').show();
+		}
+	});
+
 	function displayImg(input,_this) {
 	    if (input.files && input.files[0]) {
 	        var reader = new FileReader();
@@ -185,28 +198,40 @@
 			method: 'POST',
 			type: 'POST',
 			success: function(resp){
+				try {
 				resp = JSON.parse(resp);
 				if(resp.status == 'success'){
 					alert_toast(resp.message, 'success');
-					if(resp.errors.length > 0){
-						var errorMsg = '<ul>';
+						if(resp.errors && resp.errors.length > 0){
+							var errorMsg = '<div class="alert alert-info alert-dismissible fade show" role="alert">';
 						resp.errors.forEach(function(error){
-							errorMsg += '<li>' + error + '</li>';
+								errorMsg += '<div>' + error + '</div>';
 						});
-						errorMsg += '</ul>';
-						$('#bulkStudentModal .modal-body').prepend('<div class="alert alert-warning">' + errorMsg + '</div>');
+							errorMsg += '<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>';
+							$('#bulkStudentFeedback').html(errorMsg);
 					}
-					setTimeout(function(){
-						location.reload();
-					}, 1500);
+						$('#bulkStudentModal').modal('hide');
+						$('#bulkStudentForm')[0].reset();
 				} else {
 					alert_toast(resp.message, 'error');
-					end_load();
+						if(resp.errors && resp.errors.length > 0){
+							var errorMsg = '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+							resp.errors.forEach(function(error){
+								errorMsg += '<div>' + error + '</div>';
+							});
+							errorMsg += '<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>';
+							$('#bulkStudentFeedback').html(errorMsg);
+						}
+					}
+				} catch(e) {
+					console.error('Error parsing response:', e);
+					alert_toast('Error processing response', 'error');
 				}
+				end_load();
 			},
-			error: function(err){
-				console.log(err);
-				alert_toast('An error occurred', 'error');
+			error: function(xhr, status, error){
+				console.error('AJAX error:', error);
+				alert_toast('Error uploading file: ' + error, 'error');
 				end_load();
 			}
 		});

@@ -49,13 +49,7 @@ include '../db_connect.php';
 						<?php endwhile; ?>
 					</select>
 				</div>
-				<div class="form-group">
-					<label for="" class="control-label">Type</label>
-					<select name="" id="type" class="form-control form-control-sm select2">
-						<option value="regular">Regular</option>
-						<option value="irregular">Irregular</option>
-					</select>
-				</div>
+				<input type="hidden" id="type" value="regular">
 				<div class="form-group">
 					<div class="d-flex w-100 justify-content-center">
 						<button class="btn btn-sm btn-primary" id="add_to_list" type="button">Add to List</button>
@@ -121,7 +115,9 @@ include '../db_connect.php';
 								<input type="hidden" name="type[]" value="<?php echo $row['type'] ?>">
 							</td>
 							<td class="text-center">
+								<?php if($row['type'] == 'regular'): ?>
 								<button class="btn btn-sm btn-outline-danger remove_restriction" type="button" data-id="<?php echo $row['id'] ?>"><i class="fa fa-trash"></i></button>
+								<?php endif; ?>
 							</td>
 						</tr>
 					<?php endwhile; ?>
@@ -312,23 +308,23 @@ include '../db_connect.php';
 						return false;
 					} else {
 						// No duplicate found, proceed with adding to list
-						var f_arr = <?php echo json_encode($f_arr) ?>;
-						var c_arr = <?php echo json_encode($c_arr) ?>;
-						var s_arr = <?php echo json_encode($s_arr) ?>;
-						
-						var tr = $("<tr></tr>");
-						tr.append('<td><b>'+f_arr[fid].name+'</b><input type="hidden" name="rid[]" value=""><input type="hidden" name="faculty_id[]" value="'+fid+'"></td>');
-						tr.append('<td><b>'+c_arr[cid].class+'</b><input type="hidden" name="class_id[]" value="'+cid+'"></td>');
-						tr.append('<td><b>'+s_arr[sid].subj+'</b><input type="hidden" name="subject_id[]" value="'+sid+'"></td>');
-						tr.append('<td><b>'+type.charAt(0).toUpperCase() + type.slice(1)+'</b><input type="hidden" name="type[]" value="'+type+'"></td>');
-						tr.append('<td class="text-center"><button class="btn btn-sm btn-outline-danger remove_restriction" type="button"><i class="fa fa-trash"></i></button></td>');
-						$('#r-list tbody').append(tr);
-						
-						// Clear form
-						frm.find('#class_id').val('').trigger('change');
-						frm.find('#faculty_id').val('').trigger('change');
-						frm.find('#subject_id').val('').trigger('change');
-						end_load();
+			var f_arr = <?php echo json_encode($f_arr) ?>;
+			var c_arr = <?php echo json_encode($c_arr) ?>;
+			var s_arr = <?php echo json_encode($s_arr) ?>;
+			
+			var tr = $("<tr></tr>");
+			tr.append('<td><b>'+f_arr[fid].name+'</b><input type="hidden" name="rid[]" value=""><input type="hidden" name="faculty_id[]" value="'+fid+'"></td>');
+			tr.append('<td><b>'+c_arr[cid].class+'</b><input type="hidden" name="class_id[]" value="'+cid+'"></td>');
+			tr.append('<td><b>'+s_arr[sid].subj+'</b><input type="hidden" name="subject_id[]" value="'+sid+'"></td>');
+			tr.append('<td><b>'+type.charAt(0).toUpperCase() + type.slice(1)+'</b><input type="hidden" name="type[]" value="'+type+'"></td>');
+			tr.append('<td class="text-center"><button class="btn btn-sm btn-outline-danger remove_restriction" type="button"><i class="fa fa-trash"></i></button></td>');
+			$('#r-list tbody').append(tr);
+			
+			// Clear form
+			frm.find('#class_id').val('').trigger('change');
+			frm.find('#faculty_id').val('').trigger('change');
+			frm.find('#subject_id').val('').trigger('change');
+			end_load();
 					}
 				},
 				error: function(xhr, status, error) {
@@ -368,7 +364,7 @@ include '../db_connect.php';
 								alert_toast("Restriction deleted successfully", "success");
 							} else {
 								alert_toast("Error: " + (response.error || "Failed to delete restriction"), "error");
-							}
+			}
 						} catch(e) {
 							console.error('Error parsing response:', e);
 							alert_toast("Error deleting restriction", "error");

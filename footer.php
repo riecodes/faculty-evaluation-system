@@ -28,9 +28,7 @@
         $('body').prepend('<div id="preloader2"></div>')
     }
     window.end_load = function () {
-        $('#preloader2').fadeOut('fast', function () {
-            $(this).remove();
-        })
+        $('#preloader2').remove()
     }
     window.viewer_modal = function ($src = '') {
         start_load()
@@ -90,7 +88,7 @@
             toast: true,
             position: $pos || 'top-end',
             showConfirmButton: false,
-            timer: 5000,
+            timer: 0,
             iconColor: 'white',
             
         });

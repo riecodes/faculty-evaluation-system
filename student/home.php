@@ -39,8 +39,11 @@ $astat = array("Not Yet Started", "Started", "Closed");
   <!-- Page header with title -->
   <div class="bg-white p-3 mb-4 border shadow-sm">
     <div class="d-flex justify-content-between align-items-center">
-      <h1 class="text-success h3 mb-0">Welcome back, <b style="color: #183f74;"><?php echo $_SESSION['login_name'] ?></b>!</h1>
-      
+      <h1 class="text-success h3 mb-0">Welcome back, 
+        <b style="color: #183f74; margin-right:10px;">
+          <?php echo $_SESSION['login_name'] ?>!
+        </b>
+      </h1>
       <!-- Academic year and evaluation status information -->
       <div class="bg-primary text-white p-3 rounded">
         <h6 class="mb-1">
@@ -60,12 +63,27 @@ $astat = array("Not Yet Started", "Started", "Closed");
     $student_id = $_SESSION['login_id'];
     $qry = $conn->query("SELECT class_id FROM student_list WHERE id = '$student_id'")->fetch_assoc();
     $class_id = $qry['class_id'];
-    $class = $conn->query("SELECT concat(curriculum,' ',level,' - ',section) as class_name FROM class_list WHERE id = '$class_id'")->fetch_assoc();
+    
+    if($class_id !== null) {
+        $class = $conn->query("SELECT concat(curriculum,' ',level,' - ',section) as class_name FROM class_list WHERE id = '$class_id'")->fetch_assoc();
+        $class_name = $class['class_name'];
+    } else {
+        $class_name = "N/A";
+    }
     ?>
     <div class="col-12 col-sm-6 col-md-4 mb-4">
       <div class="small-box bg-white shadow-sm border">
         <div class="inner">
-          <h3 class="text-success"><?php echo $class['class_name']; ?></h3>
+          <h3 class="text-success">          
+            <?php 
+            $student_info = $conn->query("SELECT type FROM student_list WHERE id = '$student_id'")->fetch_assoc();
+            if($student_info['type'] == 'irregular') {
+                echo '<span class="badge bg-warning text-dark">Irregular Student</span>';
+            } else {
+                echo $class_name;
+            }
+            ?>
+          </h3>
           <p>Current Class</p>
         </div>
         <div class="icon cursor-pointer">
@@ -76,12 +94,28 @@ $astat = array("Not Yet Started", "Started", "Closed");
 
     <!-- Subjects Enrolled -->
     <?php 
-    $subjects = $conn->query("SELECT COUNT(DISTINCT(subject_id)) as total FROM restriction_list WHERE class_id = '$class_id'")->fetch_assoc();
+    $student_id = $_SESSION['login_id'];
+    $student_info = $conn->query("SELECT type FROM student_list WHERE id = '$student_id'")->fetch_assoc();
+    
+    if($student_info['type'] == 'irregular') {
+        // For irregular students, count from irregular_enrollments
+        $subjects = $conn->query("SELECT COUNT(DISTINCT(subject_id)) as total 
+            FROM irregular_enrollments 
+            WHERE student_id = '$student_id' 
+            AND academic_id = {$_SESSION['academic']['id']}")->fetch_assoc();
+    } else {
+        // For regular students, count from restriction_list
+        $subjects = $conn->query("SELECT COUNT(DISTINCT(subject_id)) as total 
+            FROM restriction_list 
+            WHERE class_id = '$class_id' 
+            AND academic_id = {$_SESSION['academic']['id']}")->fetch_assoc();
+    }
+    $subject_count = $subjects['total'];
     ?>
     <div class="col-12 col-sm-6 col-md-4 mb-4">
       <div class="small-box bg-white shadow-sm border">
         <div class="inner">
-          <h3 class="text-success"><?php echo $subjects['total']; ?></h3>
+          <h3 class="text-success"><?php echo $subject_count; ?></h3>
           <p>Subjects Enrolled</p>
         </div>
         <div class="icon cursor-pointer">

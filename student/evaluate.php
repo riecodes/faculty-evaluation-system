@@ -184,7 +184,7 @@ if ($is_irregular) {
 						<?php echo $_SESSION['academic']['year'] . ' ' . (ordinal_suffix($_SESSION['academic']['semester'])) ?>
 					</b>
 					<div class="card-tools">
-						<button class="btn btn-sm btn-primary mx-1" form="manage-evaluation">Submit
+						<button class="btn btn-sm btn-primary mx-1" form="manage-evaluation" id="submit-evaluation" <?php echo $is_irregular ? 'disabled' : '' ?>>Submit
 							Evaluation</button>
 					</div>
 				</div>
@@ -367,7 +367,7 @@ if ($is_irregular) {
 							return;
 						}
 						
-						var options = '<option value="">Select Subject</option>';
+							var options = '<option value="">Select Subject</option>';
 						if(data && data.length > 0) {
 							data.forEach(function(item) {
 								options += '<option value="' + item.id + '">' + item.code + ' - ' + item.subject + '</option>';
@@ -438,7 +438,7 @@ if ($is_irregular) {
 							return;
 						}
 						
-						var options = '<option value="">Select Section</option>';
+							var options = '<option value="">Select Section</option>';
 						if(data && data.length > 0) {
 							data.forEach(function(item) {
 								options += '<option value="' + item.id + '">' + item.class + '</option>';
@@ -524,6 +524,9 @@ if ($is_irregular) {
 				$('#faculty, #subject, #class').prop('disabled', true);
 				$('#proceed-btn').prop('disabled', true);
 				
+				// Enable submit evaluation button
+				$('#submit-evaluation').prop('disabled', false);
+				
 				// Show success message
 				$('#selection-error')
 					.removeClass('alert-danger')
@@ -573,7 +576,7 @@ if ($is_irregular) {
 			$('#debug-box .card-header').removeClass('bg-danger').addClass('bg-dark');
 		}
 	}
-
+	
 	$('#manage-evaluation').submit(function(e) {
 		e.preventDefault();
 		start_load();

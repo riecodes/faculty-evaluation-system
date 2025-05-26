@@ -45,8 +45,14 @@ if ($action == 'save_user') {
 }
 if ($action == 'update_user') {
     $save = $crud->update_user();
-    if ($save)
-        echo $save;
+    if ($save) {
+        $response = json_decode($save, true);
+        if ($response['status'] == 1) {
+            echo 1;
+        } else {
+            echo $response['message'];
+        }
+    }
 }
 if ($action == 'delete_user') {
     $save = $crud->delete_user();
@@ -449,13 +455,13 @@ if ($action == 'get_report') {
 }
 
 if ($action == 'import_students_csv') {
-    $result = $crud->import_students_csv($_FILES['studentCSV']);
-    echo json_encode($result);
+    $response = $crud->import_students_csv($_FILES['studentCSV']);
+    echo json_encode($response);
 }
 
 if ($action == 'import_faculty_csv') {
-    $result = $crud->import_faculty_csv($_FILES['facultyCSV']);
-    echo json_encode($result);
+    $response = $crud->import_faculty_csv($_FILES['facultyCSV']);
+    echo json_encode($response);
 }
 
 if ($action == 'mark_irregular') {
