@@ -161,6 +161,78 @@ MAIL_FROM_NAME="Faculty Evaluation System"
 - XSS protection
 - CSRF protection
 
+## 📝 Recent Changes
+
+### Version 1.1.0 (2024-03-19)
+- **Duplicate Enrollment Validation**
+  - Added validation to prevent duplicate enrollments for irregular students
+  - Implemented in `admin_class.php`, `ajax.php`, and `manage_irregular_enrollments.php`
+  - Added transaction handling for data consistency
+  - Improved error messaging and user feedback
+
+### Version 1.0.9 (2024-03-18)
+- **Evaluation Report Improvements**
+  - Limited percentage display to 2 decimal places
+  - Improved table cell alignment and styling
+  - Enhanced comment section formatting
+  - Removed duplicate send reminders button
+
+### Version 1.0.8 (2024-03-17)
+- **Irregular Student Evaluation**
+  - Added "Proceed to Evaluation" button for irregular students
+  - Disabled submit evaluation button until proceeding
+  - Improved class display for irregular students
+  - Enhanced validation for irregular student evaluations
+
+### Version 1.0.7 (2024-03-16)
+- **Database Management**
+  - Added truncate tables functionality
+  - Created script to reset auto_increment values
+  - Preserved users and system_settings tables
+  - Added foreign key check handling
+
+### Version 1.0.6 (2024-03-15)
+- **UI/UX Improvements**
+  - Enhanced table layouts and responsiveness
+  - Improved form validation feedback
+  - Added loading indicators
+  - Updated color scheme and typography
+
+### Version 1.0.5 (2024-03-14)
+- **Security Enhancements**
+  - Implemented input sanitization
+  - Added CSRF protection
+  - Enhanced password hashing
+  - Improved session management
+
+### Version 1.0.4 (2024-03-13)
+- **Email System**
+  - Implemented PHPMailer integration
+  - Added email templates
+  - Enhanced reminder system
+  - Improved error handling for email sending
+
+### Version 1.0.3 (2024-03-12)
+- **Report Generation**
+  - Added PDF export functionality
+  - Enhanced data visualization
+  - Improved report formatting
+  - Added batch processing for large datasets
+
+### Version 1.0.2 (2024-03-11)
+- **User Management**
+  - Added bulk user import
+  - Enhanced user profile management
+  - Improved password reset functionality
+  - Added user activity logging
+
+### Version 1.0.1 (2024-03-10)
+- **Initial Release**
+  - Basic system functionality
+  - Core evaluation features
+  - User authentication
+  - Database structure
+
 ## 🤝 Contributing
 
 1. Fork the repository

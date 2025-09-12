@@ -83,8 +83,9 @@ class Action
     {
         extract($_POST);
         $data = "";
+        $type = array("", "users", "faculty_list", "student_list");
         foreach ($_POST as $k => $v) {
-            if (!in_array($k, array('id', 'cpass', 'password')) && !is_numeric($k)) {
+            if (!in_array($k, array('id', 'cpass', 'table', 'password')) && !is_numeric($k)) {
                 if (empty($data)) {
                     $data .= " $k='$v' ";
                 } else {
@@ -92,11 +93,7 @@ class Action
                 }
             }
         }
-        if (!empty($password)) {
-            $data .= ", password=md5('$password') ";
-
-        }
-        $check = $this->db->query("SELECT * FROM users where email ='$email' " . (!empty($id) ? " and id != {$id} " : ''))->num_rows;
+        $check = $this->db->query("SELECT * FROM {$type[$_SESSION['login_type']]} where email ='$email' " . (!empty($id) ? " and id != {$id} " : ''))->num_rows;
         if ($check > 0) {
             return 2;
             exit;
@@ -105,15 +102,32 @@ class Action
             $fname = strtotime(date('y-m-d H:i')) . '_' . $_FILES['img']['name'];
             $move = move_uploaded_file($_FILES['img']['tmp_name'], 'assets/uploads/' . $fname);
             $data .= ", avatar = '$fname' ";
-
         }
+        if (!empty($password))
+            $data .= " ,password=md5('$password') ";
+            
+        // Update student type based on class_id
+        if($_SESSION['login_type'] == 3) { // If user is a student
+            if(!empty($class_id)) {
+                $data .= ", type = 'regular' ";
+            } else {
+                $data .= ", type = 'irregular' ";
+            }
+        }
+            
         if (empty($id)) {
-            $save = $this->db->query("INSERT INTO users set $data");
+            $save = $this->db->query("INSERT INTO {$type[$_SESSION['login_type']]} set $data");
         } else {
-            $save = $this->db->query("UPDATE users set $data where id = $id");
+            $save = $this->db->query("UPDATE {$type[$_SESSION['login_type']]} set $data where id = $id");
         }
 
         if ($save) {
+            foreach ($_POST as $key => $value) {
+                if ($key != 'password' && !is_numeric($key))
+                    $_SESSION['login_' . $key] = $value;
+            }
+            if (isset($_FILES['img']) && !empty($_FILES['img']['tmp_name']))
+                $_SESSION['login_avatar'] = $fname;
             return 1;
         }
     }
@@ -174,44 +188,97 @@ class Action
         extract($_POST);
         $data = "";
         $type = array("", "users", "faculty_list", "student_list");
+        $debug_info = array();
+        
+        try {
+            // Validate required fields
+            if(empty($firstname) || empty($lastname) || empty($email)) {
+                throw new Exception("Required fields are missing");
+            }
+            
+            // Validate email format
+            if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new Exception("Invalid email format");
+            }
+            
+            // Build data string
         foreach ($_POST as $k => $v) {
             if (!in_array($k, array('id', 'cpass', 'table', 'password')) && !is_numeric($k)) {
-
                 if (empty($data)) {
-                    $data .= " $k='$v' ";
+                        $data .= " $k='" . $this->db->real_escape_string($v) . "' ";
                 } else {
-                    $data .= ", $k='$v' ";
+                        $data .= ", $k='" . $this->db->real_escape_string($v) . "' ";
                 }
             }
         }
-        $check = $this->db->query("SELECT * FROM {$type[$_SESSION['login_type']]} where email ='$email' " . (!empty($id) ? " and id != {$id} " : ''))->num_rows;
+            
+            // Check for duplicate email
+            $check = $this->db->query("SELECT * FROM {$type[$_SESSION['login_type']]} where email ='" . $this->db->real_escape_string($email) . "' " . (!empty($id) ? " and id != {$id} " : ''))->num_rows;
         if ($check > 0) {
-            return 2;
-            exit;
+                throw new Exception("Email already exists");
         }
+            
+            // Handle file upload
         if (isset($_FILES['img']) && $_FILES['img']['tmp_name'] != '') {
             $fname = strtotime(date('y-m-d H:i')) . '_' . $_FILES['img']['name'];
             $move = move_uploaded_file($_FILES['img']['tmp_name'], 'assets/uploads/' . $fname);
+                if(!$move) {
+                    throw new Exception("Failed to upload image");
+                }
             $data .= ", avatar = '$fname' ";
-
-        }
-        if (!empty($password))
-            $data .= " ,password=md5('$password') ";
+            }
+            
+            // Handle password update
+            if (!empty($password)) {
+                $data .= " ,password=md5('" . $this->db->real_escape_string($password) . "') ";
+            }
+            
+            // For students, preserve their type when updating
+            if($_SESSION['login_type'] == 3) { // If user is a student
+                // Get current student type
+                $current_type = $this->db->query("SELECT type FROM student_list WHERE id = $id")->fetch_assoc()['type'];
+                $data .= ", type = '$current_type' ";
+            }
+            
+            // Perform update or insert
         if (empty($id)) {
-            $save = $this->db->query("INSERT INTO {$type[$_SESSION['login_type']]} set $data");
+                $sql = "INSERT INTO {$type[$_SESSION['login_type']]} set $data";
+                $debug_info[] = "Insert SQL: " . $sql;
+                $save = $this->db->query($sql);
         } else {
-            echo "UPDATE {$type[$_SESSION['login_type']]} set $data where id = $id";
-            $save = $this->db->query("UPDATE {$type[$_SESSION['login_type']]} set $data where id = $id");
+                $sql = "UPDATE {$type[$_SESSION['login_type']]} set $data where id = $id";
+                $debug_info[] = "Update SQL: " . $sql;
+                $save = $this->db->query($sql);
         }
 
-        if ($save) {
+            if (!$save) {
+                throw new Exception("Database error: " . $this->db->error);
+            }
+            
+            // Update session data
             foreach ($_POST as $key => $value) {
-                if ($key != 'password' && !is_numeric($key))
+                if ($key != 'password' && !is_numeric($key)) {
                     $_SESSION['login_' . $key] = $value;
             }
-            if (isset($_FILES['img']) && !empty($_FILES['img']['tmp_name']))
+            }
+            if (isset($_FILES['img']) && !empty($_FILES['img']['tmp_name'])) {
                 $_SESSION['login_avatar'] = $fname;
-            return 1;
+            }
+            
+            $debug_info[] = "Operation completed successfully";
+            return json_encode(array(
+                'status' => 1,
+                'message' => 'User updated successfully',
+                'debug' => implode("\n", $debug_info)
+            ));
+            
+        } catch (Exception $e) {
+            $debug_info[] = "Error: " . $e->getMessage();
+            return json_encode(array(
+                'status' => 0,
+                'message' => $e->getMessage(),
+                'debug' => implode("\n", $debug_info)
+            ));
         }
     }
     function delete_user()
@@ -666,6 +733,132 @@ class Action
             return 1;
         }
     }
+    function save_enrollment()
+    {
+        extract($_POST);
+        $data = "";
+        foreach ($_POST as $k => $v) {
+            if (!in_array($k, array('id')) && !is_numeric($k)) {
+                if (empty($data)) {
+                    $data .= " $k='$v' ";
+                } else {
+                    $data .= ", $k='$v' ";
+                }
+            }
+        }
+
+        // Start transaction
+        $this->db->query("START TRANSACTION");
+        
+        try {
+            // Check for duplicate enrollment
+            $duplicate_check = $this->db->query("SELECT id FROM irregular_enrollments 
+                WHERE student_id = '{$_POST['student_id']}' 
+                AND faculty_id = '{$_POST['faculty_id']}' 
+                AND subject_id = '{$_POST['subject_id']}' 
+                AND class_id = '{$_POST['class_id']}' 
+                AND academic_id = '{$_POST['academic_id']}'" . 
+                (!empty($id) ? " AND id != $id" : ""));
+            
+            if($duplicate_check->num_rows > 0) {
+                throw new Exception("This student is already enrolled in this subject with this faculty and section for the selected academic year.");
+            }
+
+            if (empty($id)) {
+                // For new enrollments, first create the restriction
+                $restriction_data = " academic_id = '{$_POST['academic_id']}' ";
+                $restriction_data .= ", faculty_id = '{$_POST['faculty_id']}' ";
+                $restriction_data .= ", subject_id = '{$_POST['subject_id']}' ";
+                $restriction_data .= ", class_id = '{$_POST['class_id']}' ";
+                $restriction_data .= ", type = 'irregular'";
+                
+                $save_restriction = $this->db->query("INSERT INTO restriction_list SET " . $restriction_data);
+                
+                if(!$save_restriction) {
+                    throw new Exception("Error creating restriction: " . $this->db->error);
+                }
+                
+                $restriction_id = $this->db->insert_id;
+                
+                // Now create the enrollment
+                $data .= ", restriction_id = '$restriction_id'";
+                $save = $this->db->query("INSERT INTO irregular_enrollments SET " . $data);
+            } else {
+                // For updates, first update the restriction
+                $restriction_data = " faculty_id = '{$_POST['faculty_id']}' ";
+                $restriction_data .= ", subject_id = '{$_POST['subject_id']}' ";
+                $restriction_data .= ", class_id = '{$_POST['class_id']}' ";
+                
+                // Get the restriction_id from the enrollment
+                $restriction_id = $this->db->query("SELECT restriction_id FROM irregular_enrollments WHERE id = $id")->fetch_assoc()['restriction_id'];
+                
+                if($restriction_id) {
+                    $update_restriction = $this->db->query("UPDATE restriction_list SET " . $restriction_data . " WHERE id = $restriction_id");
+                    if(!$update_restriction) {
+                        throw new Exception("Error updating restriction: " . $this->db->error);
+                    }
+                }
+                
+                // Then update the enrollment
+                $save = $this->db->query("UPDATE irregular_enrollments SET " . $data . " WHERE id = $id");
+            }
+            
+            if(!$save) {
+                throw new Exception("Error saving enrollment: " . $this->db->error);
+            }
+            
+            $this->db->query("COMMIT");
+            return json_encode(['status' => 1, 'message' => 'Enrollment saved successfully']);
+            
+        } catch (Exception $e) {
+            $this->db->query("ROLLBACK");
+            error_log("Error in save_enrollment: " . $e->getMessage());
+            return json_encode(['status' => 0, 'error' => $e->getMessage()]);
+        }
+    }
+
+    function get_enrollment()
+    {
+        extract($_POST);
+        $data = $this->db->query("SELECT * FROM irregular_enrollments where id = $id")->fetch_assoc();
+        return json_encode(['status' => 1, 'data' => $data]);
+    }
+
+    function delete_enrollment()
+    {
+        extract($_POST);
+        
+        // Start transaction
+        $this->db->query("START TRANSACTION");
+        
+        try {
+            // Get the restriction_id from the enrollment
+            $restriction_id = $this->db->query("SELECT restriction_id FROM irregular_enrollments WHERE id = $id")->fetch_assoc()['restriction_id'];
+            
+            // Delete the enrollment
+            $delete_enrollment = $this->db->query("DELETE FROM irregular_enrollments WHERE id = $id");
+            if(!$delete_enrollment) {
+                throw new Exception("Error deleting enrollment: " . $this->db->error);
+            }
+            
+            // Delete the corresponding restriction
+            if($restriction_id) {
+                $delete_restriction = $this->db->query("DELETE FROM restriction_list WHERE id = $restriction_id");
+                if(!$delete_restriction) {
+                    throw new Exception("Error deleting restriction: " . $this->db->error);
+                }
+            }
+            
+            $this->db->query("COMMIT");
+            return 1;
+            
+        } catch (Exception $e) {
+            $this->db->query("ROLLBACK");
+            error_log("Error in delete_enrollment: " . $e->getMessage());
+            return $e->getMessage();
+        }
+    }
+
     function save_restriction()
     {
         extract($_POST);
@@ -746,17 +939,37 @@ class Action
         
         $debug_info = array();
         $debug_info[] = "POST data: " . print_r($_POST, true);
-        $debug_info[] = "Rate array: " . print_r($rate, true);
         
-        $data = " student_id = {$_SESSION['login_id']} ";
-        $data .= ", academic_id = $academic_id ";
-        $data .= ", subject_id = $subject_id ";
-        $data .= ", class_id = $class_id ";
-        $data .= ", faculty_id = $faculty_id ";
+        // Validate required fields
+        if(!isset($faculty_id) || !isset($subject_id) || !isset($class_id) || !isset($academic_id)) {
+            return json_encode([
+                'status' => 0,
+                'error' => 'Missing required fields',
+                'debug' => implode("\n", $debug_info)
+            ]);
+        }
         
         // Check if student is irregular
         $student_type = $this->db->query("SELECT type FROM student_list WHERE id = {$_SESSION['login_id']}")->fetch_assoc()['type'];
         $is_irregular = ($student_type == 'irregular');
+        
+        // For irregular students, verify the enrollment exists
+        if($is_irregular) {
+            $enrollment_check = $this->db->query("SELECT id FROM irregular_enrollments 
+                WHERE student_id = {$_SESSION['login_id']}
+                AND faculty_id = $faculty_id 
+                AND subject_id = $subject_id 
+                AND class_id = $class_id 
+                AND academic_id = $academic_id");
+            
+            if($enrollment_check->num_rows == 0) {
+                return json_encode([
+                    'status' => 0,
+                    'error' => 'Invalid faculty-subject-section combination for irregular student',
+                    'debug' => implode("\n", $debug_info)
+                ]);
+            }
+        }
         
         // Check if evaluation already exists
         $chk = $this->db->query("SELECT * FROM evaluation_list 
@@ -767,14 +980,18 @@ class Action
             AND class_id = $class_id");
         
         if($chk->num_rows > 0) {
-            return "You have already evaluated this faculty for this subject.";
+            return json_encode([
+                'status' => 0,
+                'error' => 'You have already evaluated this faculty for this subject.',
+                'debug' => implode("\n", $debug_info)
+            ]);
         }
         
         // Begin transaction
         $this->db->query("START TRANSACTION");
         
         try {
-            // For irregular students, check if restriction exists first
+            // Get or create restriction
             if($is_irregular) {
                 $restriction_check = $this->db->query("SELECT id FROM restriction_list 
                     WHERE academic_id = $academic_id 
@@ -820,75 +1037,74 @@ class Action
                 }
             }
             
+            // Create evaluation entry
+        $data = " student_id = {$_SESSION['login_id']} ";
+        $data .= ", academic_id = $academic_id ";
+        $data .= ", subject_id = $subject_id ";
+        $data .= ", class_id = $class_id ";
+        $data .= ", faculty_id = $faculty_id ";
             $data .= ", restriction_id = $restriction_id ";
-            $save = $this->db->query("INSERT INTO evaluation_list set $data");
             
-            if ($save) {
-                $eid = $this->db->insert_id;
-                foreach ($qid as $k => $v) {
-                    $data = " evaluation_id = $eid ";
-                    $data .= ", question_id = $v ";
-                    
-                    // Get question type
-                    $qtype = $this->db->query("SELECT type FROM question_list WHERE id = $v")->fetch_array()['type'];
-                    
-                    // Debug info
-                    $debug_info[] = "Processing question $v of type $qtype";
-                    $debug_info[] = "Rate data for question $v: " . print_r($rate[$v], true);
-                    
-                    if($qtype == 'checklist') {
-                        $data .= ", rate = {$rate[$v]} ";
-                        $data .= ", comment = NULL ";
-                    } else if($qtype == 'textfield') {
-                        // For textfield type, keep rate as 0 and set the comment
-                        $data .= ", rate = 0 ";
-                        
-                        // Get the comment text from the rate array
-                        $comment_text = isset($rate[$v]) ? trim($rate[$v]) : '';
-                        
-                        // Debug info
-                        $debug_info[] = "Comment text for question $v: " . $comment_text;
-                        
-                        if(!empty($comment_text)) {
-                            $comment = $this->db->real_escape_string($comment_text);
-                            $data .= ", comment = '$comment' ";
-                            $debug_info[] = "Setting comment for question $v to: " . $comment;
-                        } else {
-                            $data .= ", comment = NULL ";
-                            $debug_info[] = "No comment text for question $v";
-                        }
+        $save = $this->db->query("INSERT INTO evaluation_list set $data");
+            
+            if (!$save) {
+                throw new Exception("Error saving evaluation: " . $this->db->error);
+            }
+            
+            $eid = $this->db->insert_id;
+            
+            // Get questions for this academic year
+            $questions = $this->db->query("SELECT id, type FROM question_list WHERE academic_id = $academic_id");
+            if(!$questions) {
+                throw new Exception("Error fetching questions: " . $this->db->error);
+            }
+            
+            // Process each question
+            while($question = $questions->fetch_assoc()) {
+                $qid = $question['id'];
+                $qtype = $question['type'];
+                
+                $data = " evaluation_id = $eid ";
+                $data .= ", question_id = $qid ";
+                
+                if($qtype == 'checklist') {
+                    if(!isset($rate[$qid])) {
+                        throw new Exception("Missing rating for question $qid");
                     }
-                    
-                    // Debug info
-                    $debug_info[] = "SQL for question $v: INSERT INTO evaluation_answers set $data";
-                    
-                    $ins[] = $this->db->query("INSERT INTO evaluation_answers set $data");
-                    
-                    // Debug info for any database errors
-                    if($this->db->error) {
-                        $debug_info[] = "Database error for question $v: " . $this->db->error;
+                    $data .= ", rate = " . intval($rate[$qid]) . " ";
+                    $data .= ", comment = NULL ";
+                } else if($qtype == 'textfield') {
+                    $data .= ", rate = 0 ";
+                    $comment_text = isset($rate[$qid]) ? trim($rate[$qid]) : '';
+                    if(!empty($comment_text)) {
+                        $comment = $this->db->real_escape_string($comment_text);
+                        $data .= ", comment = '$comment' ";
+                } else {
+                        $data .= ", comment = NULL ";
                     }
                 }
                 
-                if (isset($ins)) {
-                    $this->db->query("COMMIT");
-                    return json_encode(array(
-                        'status' => 1,
-                        'debug' => implode("\n", $debug_info)
-                    ));
+                $ins = $this->db->query("INSERT INTO evaluation_answers set $data");
+                if(!$ins) {
+                    throw new Exception("Error saving answer for question $qid: " . $this->db->error);
                 }
             }
             
-            throw new Exception("Error saving evaluation");
+            $this->db->query("COMMIT");
+            return json_encode([
+                'status' => 1,
+                'message' => 'Evaluation submitted successfully',
+                'debug' => implode("\n", $debug_info)
+            ]);
             
         } catch (Exception $e) {
             $this->db->query("ROLLBACK");
             $debug_info[] = "Error in save_evaluation: " . $e->getMessage();
-            return json_encode(array(
+            return json_encode([
                 'status' => 0,
                 'error' => $e->getMessage(),
                 'debug' => implode("\n", $debug_info)
-            ));
+            ]);
         }
     }
     function get_class()
@@ -989,7 +1205,7 @@ class Action
 
         if (($handle = fopen($file['tmp_name'], "r")) !== FALSE) {
             $header = fgetcsv($handle); // Get header row
-            $required_fields = ['school_id', 'firstname', 'lastname', 'class_id', 'email', 'password', 'status'];
+            $required_fields = ['school_id', 'firstname', 'lastname', 'email', 'password']; // Removed class_id from required
             
             // Validate header
             if (count(array_diff($required_fields, $header)) > 0) {
@@ -1003,9 +1219,9 @@ class Action
             while (($data = fgetcsv($handle)) !== FALSE) {
                 $row = array_combine($header, $data);
                 
-                // Validate required fields
+                // Validate required fields (excluding class_id)
                 if (empty($row['school_id']) || empty($row['firstname']) || empty($row['lastname']) || 
-                    empty($row['email']) || empty($row['password']) || empty($row['class_id'])) {
+                    empty($row['email']) || empty($row['password'])) {
                     $failed++;
                     $errors[] = "Row " . ($success + $failed) . ": Missing required fields";
                     continue;
@@ -1027,12 +1243,15 @@ class Action
                     continue;
                 }
 
-                // Validate class_id exists
-                $check = $this->db->query("SELECT * FROM class_list where id = '" . (int)$row['class_id'] . "'")->num_rows;
+                // Validate class_id if provided
+                $class_id = isset($row['class_id']) && !empty($row['class_id']) ? (int)$row['class_id'] : null;
+                if ($class_id !== null) {
+                    $check = $this->db->query("SELECT * FROM class_list where id = '$class_id'")->num_rows;
                 if ($check == 0) {
                     $failed++;
-                    $errors[] = "Row " . ($success + $failed) . ": Invalid Class ID {$row['class_id']}";
+                        $errors[] = "Row " . ($success + $failed) . ": Invalid Class ID {$class_id}";
                     continue;
+                    }
                 }
 
                 // Prepare data for insertion
@@ -1041,7 +1260,8 @@ class Action
                 $data .= ", lastname = '" . $this->db->real_escape_string($row['lastname']) . "' ";
                 $data .= ", email = '" . $this->db->real_escape_string($row['email']) . "' ";
                 $data .= ", password = '" . md5($row['password']) . "' "; // Hash the password
-                $data .= ", class_id = '" . (int)$row['class_id'] . "' ";
+                $data .= ", class_id = " . ($class_id !== null ? "'$class_id'" : "NULL") . " ";
+                $data .= ", type = " . ($class_id !== null ? "'regular'" : "'irregular'") . " ";
                 $data .= ", status = '" . (isset($row['status']) ? (int)$row['status'] : 1) . "' ";
 
                 $save = $this->db->query("INSERT INTO student_list set $data");
@@ -1193,36 +1413,41 @@ class Action
         extract($_POST);
         $data = array();
         
-        // Validate faculty_id
-        if(!isset($faculty_id) || empty($faculty_id)) {
-            return json_encode(['error' => 'Faculty ID is required']);
-        }
-        
-        // Sanitize faculty_id
-        $faculty_id = $this->db->real_escape_string($faculty_id);
-        
         try {
+            // Validate faculty_id
+            if(!isset($faculty_id) || empty($faculty_id)) {
+                return json_encode(['error' => 'Faculty ID is required']);
+            }
+            
+            // Sanitize faculty_id
+            $faculty_id = $this->db->real_escape_string($faculty_id);
+            
             // Validate academic_id session
             if(!isset($_SESSION['academic']['id'])) {
                 throw new Exception('Academic session not found');
             }
             
             $academic_id = $this->db->real_escape_string($_SESSION['academic']['id']);
+            $student_id = $this->db->real_escape_string($_SESSION['login_id']);
             
-            // Modified query to get all subjects
-            $get = $this->db->query("SELECT DISTINCT s.id, s.code, s.subject 
-                FROM subject_list s 
-                ORDER BY s.code");
+            // Get subjects from irregular_enrollments for this student and faculty
+        $get = $this->db->query("SELECT DISTINCT s.id, s.code, s.subject 
+                FROM irregular_enrollments e 
+                INNER JOIN subject_list s ON s.id = e.subject_id 
+                WHERE e.student_id = $student_id 
+                AND e.faculty_id = $faculty_id 
+                AND e.academic_id = $academic_id 
+            ORDER BY s.code");
                 
             if(!$get) {
                 throw new Exception($this->db->error);
             }
             
-            while ($row = $get->fetch_assoc()) {
-                $data[] = $row;
-            }
+        while ($row = $get->fetch_assoc()) {
+            $data[] = $row;
+        }
             
-            return json_encode($data);
+        return json_encode($data);
             
         } catch (Exception $e) {
             error_log("Error in get_faculty_subjects: " . $e->getMessage());
@@ -1235,25 +1460,32 @@ class Action
         $data = array();
         
         try {
-            // Log the incoming request
-            error_log("get_faculty_sections called with POST data: " . print_r($_POST, true));
-            
-            // Validate academic_id session
+            // Validate required parameters
             if(!isset($_SESSION['academic']['id'])) {
                 throw new Exception('Academic session not found');
             }
             
-            // Validate subject_id
+            if(!isset($faculty_id) || empty($faculty_id)) {
+                throw new Exception('Faculty ID is required');
+            }
+            
             if(!isset($subject_id) || empty($subject_id)) {
                 throw new Exception('Subject ID is required');
             }
             
             $academic_id = $this->db->real_escape_string($_SESSION['academic']['id']);
+            $faculty_id = $this->db->real_escape_string($faculty_id);
             $subject_id = $this->db->real_escape_string($subject_id);
+            $student_id = $this->db->real_escape_string($_SESSION['login_id']);
             
-            // Get sections from class_list
+            // Get sections from irregular_enrollments for this student, faculty, and subject
             $query = "SELECT DISTINCT c.id, concat(c.curriculum,' ',c.level,' - ',c.section) as class 
-                FROM class_list c 
+                FROM irregular_enrollments e 
+                INNER JOIN class_list c ON c.id = e.class_id 
+                WHERE e.student_id = $student_id 
+                AND e.faculty_id = $faculty_id 
+                AND e.subject_id = $subject_id 
+                AND e.academic_id = $academic_id 
                 ORDER BY c.curriculum, c.level, c.section";
             
             error_log("Executing query: " . $query);
@@ -1264,25 +1496,17 @@ class Action
                 throw new Exception("Database error: " . $this->db->error);
             }
             
-            while ($row = $get->fetch_assoc()) {
-                $data[] = $row;
-            }
+        while ($row = $get->fetch_assoc()) {
+            $data[] = $row;
+        }
             
             error_log("Query returned " . count($data) . " results");
             
-            // Ensure we return a valid JSON response even if no data
-            if(empty($data)) {
-                error_log("No sections found, returning empty array");
-                return json_encode(array());
-            }
-            
-            $response = json_encode($data);
-            error_log("Returning response: " . $response);
-            return $response;
+        return json_encode($data);
             
         } catch (Exception $e) {
             error_log("Error in get_faculty_sections: " . $e->getMessage());
-            return json_encode(array('error' => $e->getMessage()));
+            return json_encode(['error' => $e->getMessage()]);
         }
     }
 
@@ -1302,6 +1526,6 @@ class Action
         extract($_POST);
         $delete = $this->db->query("DELETE FROM restriction_list where id = ".$id);
         if($delete)
-            return 1;
+                return 1;
     }
 }

@@ -119,6 +119,48 @@ function ordinal_suffix($num)
 	.comments-list li:last-child {
 		border-bottom: none;
 	}
+
+	/* Bar Graph Styles */
+	.bar-container {
+		position: relative;
+		width: 100%;
+		height: 25px;
+		background-color: #f8f9fa;
+		border: 1px solid #dee2e6;
+		border-radius: 3px;
+		overflow: visible;
+		min-width: 60px;
+	}
+
+	.bar-fill {
+		height: 100%;
+		transition: width 0.3s ease;
+		position: relative;
+	}
+
+	.bar-fill.rating-1 { background-color: #dc3545; } /* Red for Strongly Disagree */
+	.bar-fill.rating-2 { background-color: #fd7e14; } /* Orange for Disagree */
+	.bar-fill.rating-3 { background-color: #ffc107; } /* Yellow for Uncertain */
+	.bar-fill.rating-4 { background-color: #20c997; } /* Light Green for Agree */
+	.bar-fill.rating-5 { background-color: #28a745; } /* Green for Strongly Agree */
+
+	.bar-text {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		font-size: 11px;
+		font-weight: bold;
+		color: #ffffff;
+		text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+		z-index: 2;
+		white-space: nowrap;
+		pointer-events: none;
+	}
+
+	.bar-container:hover .bar-fill {
+		opacity: 0.8;
+	}
 </style>
 
 <div class="container-fluid px-4">
@@ -164,17 +206,36 @@ function ordinal_suffix($num)
 						$pending_query = $conn->query("SELECT 
 							s.id as student_id,
 							CONCAT(s.firstname, ' ', s.lastname) as student_name,
-							CONCAT(c.curriculum, ' ', c.level, '-', c.section) as class,
+							CASE 
+								WHEN s.type = 'regular' THEN CONCAT(c.curriculum, ' ', c.level, '-', c.section)
+								WHEN s.type = 'irregular' THEN (
+									SELECT GROUP_CONCAT(DISTINCT CONCAT(cl.curriculum, ' ', cl.level, '-', cl.section) SEPARATOR ', ')
+									FROM irregular_enrollments ie
+									JOIN class_list cl ON cl.id = ie.class_id
+									WHERE ie.student_id = s.id 
+									AND ie.academic_id = {$_SESSION['academic']['id']}
+									AND ie.faculty_id = f.id
+									AND ie.subject_id = sub.id
+								)
+							END as class,
 							CONCAT(f.firstname, ' ', f.lastname) as faculty_name,
 							sub.subject,
 							sub.code as subject_code,
 							s.email,
 							s.type as student_type
 						FROM student_list s
-						INNER JOIN class_list c ON c.id = s.class_id
-						INNER JOIN restriction_list r ON r.class_id = c.id AND r.type = s.type
-						INNER JOIN faculty_list f ON f.id = r.faculty_id
-						INNER JOIN subject_list sub ON sub.id = r.subject_id
+						LEFT JOIN class_list c ON c.id = s.class_id
+						LEFT JOIN (
+							SELECT DISTINCT e.student_id, e.faculty_id, e.subject_id, e.class_id, e.academic_id, e.restriction_id
+							FROM irregular_enrollments e
+							WHERE e.academic_id = {$_SESSION['academic']['id']}
+						) e ON e.student_id = s.id
+						LEFT JOIN restriction_list r ON (
+							(s.type = 'regular' AND r.class_id = s.class_id AND r.type = 'regular') OR
+							(s.type = 'irregular' AND r.id = e.restriction_id AND r.type = 'irregular')
+						)
+						LEFT JOIN faculty_list f ON f.id = r.faculty_id
+						LEFT JOIN subject_list sub ON sub.id = r.subject_id
 						WHERE r.academic_id = {$_SESSION['academic']['id']}
 						AND r.id NOT IN (
 							SELECT restriction_id 
@@ -205,11 +266,11 @@ function ordinal_suffix($num)
 								<td>
 									<?php 
 									if($row['student_type'] == 'irregular') {
-										// For irregular students, get class list from CSV
+										// For irregular students, get class list from the query result
 										$class_list = explode(',', $row['class']);
 										echo '<div class="class-list">';
 										foreach($class_list as $class) {
-											echo '<div class="class-list-item">' . trim($class) . '</div>';
+											echo trim($class) . '</div>';
 										}
 										echo '</div>';
 									} else {
@@ -236,7 +297,17 @@ function ordinal_suffix($num)
 				<select name="" id="faculty_id" class="form-control form-control-sm select2">
 					<option value=""></option>
 					<?php
-					$faculty = $conn->query("SELECT *,concat(firstname,' ',lastname) as name FROM faculty_list order by concat(firstname,' ',lastname) asc");
+					// Modified query to only get faculty with evaluation data
+					$faculty = $conn->query("SELECT DISTINCT f.*, concat(f.firstname,' ',f.lastname) as name 
+						FROM faculty_list f 
+						INNER JOIN restriction_list r ON r.faculty_id = f.id 
+						WHERE r.academic_id = {$_SESSION['academic']['id']}
+						AND EXISTS (
+							SELECT 1 FROM evaluation_list e 
+							WHERE e.faculty_id = f.id 
+							AND e.academic_id = {$_SESSION['academic']['id']}
+						)
+						ORDER BY concat(f.firstname,' ',f.lastname) asc");
 					$f_arr = array();
 					$fname = array();
 					while ($row = $faculty->fetch_assoc()):
@@ -274,7 +345,7 @@ function ordinal_suffix($num)
 			<div class="card shadow-sm border" id="printable">
 				<div class="card-body">
 					<div>
-						<h3 class="text-center text-primary">Evaluation Report</h3>
+						<h3 class="text-center m-0 font-weight-bold text-primary">Evaluation Report</h3>
 						<hr class="border-primary">
 						<table width="100%">
 							<tr>
@@ -368,8 +439,8 @@ function ordinal_suffix($num)
 								while ($row = $questions->fetch_assoc()):
 									$q_arr[$row['id']] = $row;
 									?>
-									<tr class="bg-white">
-										<td class="p-1" width="40%">
+									<tr>
+										<td class="p-1 align-middle" width="40%">
 											<?php echo $row['question'] ?>
 										</td>
 										<?php if ($crow['type'] == 'checklist'): ?>
@@ -429,9 +500,29 @@ function ordinal_suffix($num)
 <script>
 	$(document).ready(function () {
 		$('#faculty_id').change(function () {
-			if ($(this).val() > 0)
+			if ($(this).val() > 0) {
 				window.history.pushState({}, null, './index.php?page=report&fid=' + $(this).val());
-			load_class()
+				// Clear previous data
+				$('#fname').text('');
+				$('#classField').text('');
+				$('#subjectField').text('');
+				$('#tse').text('');
+				$('.rates').text('');
+				$('.comments-list').html('');
+				$('#print-btn').hide();
+				$('#class-list').html('');
+				load_class();
+			} else {
+				// Clear all data if no faculty selected
+				$('#fname').text('');
+				$('#classField').text('');
+				$('#subjectField').text('');
+				$('#tse').text('');
+				$('.rates').text('');
+				$('.comments-list').html('');
+				$('#print-btn').hide();
+				$('#class-list').html('<a href="javascript:void(0)" class="list-group-item list-group-item-action disabled">No data to be display.</a>');
+			}
 		})
 		if ($('#faculty_id').val() > 0)
 			load_class()
@@ -533,6 +624,11 @@ function ordinal_suffix($num)
 			error: function (err) {
 				console.log('Error loading report:', err);
 				alert_toast("An Error Occured.", "error");
+				// Clear data on error
+				$('.rates').text('');
+				$('.comments-list').html('');
+				$('#tse').text('');
+				$('#print-btn').hide();
 				end_load()
 			},
 			success: function (resp) {
@@ -550,22 +646,30 @@ function ordinal_suffix($num)
 						$('.rates').text('-')
 						$('.comments-list').html('')
 
-						// Handle checklist ratings
+						// Handle checklist ratings with bar graphs
 						var data = resp.data
 						Object.keys(data).map(q => {
 							Object.keys(data[q]).map(r => {
-								console.log($('.rate_' + r + '_' + q), data[q][r])
-								$('.rate_' + r + '_' + q).text(data[q][r] + '%')
+								var percentage = parseFloat(data[q][r]);
+								var formattedPercentage = percentage.toFixed(2) + '%';
+								
+								// Create bar graph HTML
+								var barHtml = '<div class="bar-container">' +
+									'<div class="bar-fill rating-' + r + '" style="width: ' + percentage + '%"></div>' +
+									'<span class="bar-text">' + formattedPercentage + '</span>' +
+									'</div>';
+								
+								$('.rate_' + r + '_' + q).html(barHtml);
 							})
 						})
 
-						// Handle comments
+						// Handle comments with consistent styling
 						if (resp.comments) {
 							Object.keys(resp.comments).map(q => {
 								var commentsHtml = '<ul class="list-unstyled mb-0">';
 								resp.comments[q].forEach(comment => {
 									if (comment && comment.trim() !== '') {
-										commentsHtml += '<li class="mb-2">' + comment + '</li>';
+										commentsHtml += '<li class="mb-2 p-2 border-bottom">' + comment + '</li>';
 									}
 								});
 								commentsHtml += '</ul>';

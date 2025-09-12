@@ -45,8 +45,14 @@ if ($action == 'save_user') {
 }
 if ($action == 'update_user') {
     $save = $crud->update_user();
-    if ($save)
-        echo $save;
+    if ($save) {
+        $response = json_decode($save, true);
+        if ($response['status'] == 1) {
+            echo 1;
+        } else {
+            echo $response['message'];
+        }
+    }
 }
 if ($action == 'delete_user') {
     $save = $crud->delete_user();
@@ -449,13 +455,13 @@ if ($action == 'get_report') {
 }
 
 if ($action == 'import_students_csv') {
-    $result = $crud->import_students_csv($_FILES['studentCSV']);
-    echo json_encode($result);
+    $response = $crud->import_students_csv($_FILES['studentCSV']);
+    echo json_encode($response);
 }
 
 if ($action == 'import_faculty_csv') {
-    $result = $crud->import_faculty_csv($_FILES['facultyCSV']);
-    echo json_encode($result);
+    $response = $crud->import_faculty_csv($_FILES['facultyCSV']);
+    echo json_encode($response);
 }
 
 if ($action == 'mark_irregular') {
@@ -550,6 +556,24 @@ if ($action == 'delete_restriction') {
     else
         echo json_encode(['error' => 'Failed to delete restriction']);
     exit;
+}
+
+if ($action == 'save_enrollment') {
+    $save = $crud->save_enrollment();
+    if ($save)
+        echo $save;
+}
+
+if ($action == 'get_enrollment') {
+    $get = $crud->get_enrollment();
+    if ($get)
+        echo $get;
+}
+
+if ($action == 'delete_enrollment') {
+    $delete = $crud->delete_enrollment();
+    if ($delete)
+        echo $delete;
 }
 
 ob_end_flush();

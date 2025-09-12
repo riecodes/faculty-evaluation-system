@@ -476,6 +476,49 @@ Required Changes:
    - Added unique key tracking for restrictions
    - Implemented proper comparison for restriction updates
 
+2. [x] Implemented Duplicate Enrollment Validation:
+   - Modified save_enrollment() in admin_class.php:
+     * Added transaction handling
+     * Added duplicate check query
+     * Returns JSON response with status and message
+     * Proper error handling with rollback
+     * Maintains data integrity
+   
+   - Updated ajax.php:
+     * Modified save_enrollment handler
+     * Passes through JSON response from admin_class.php
+     * Maintains consistent response format
+   
+   - Updated manage_irregular_enrollments.php:
+     * Modified AJAX success handler
+     * Added proper JSON response handling
+     * Improved error message display
+     * Better user feedback
+   
+   - Implementation Flow:
+     * Frontend sends enrollment data
+     * admin_class.php validates for duplicates
+     * Returns JSON response
+     * Frontend displays appropriate message
+   
+   - Error Handling:
+     * Duplicate enrollments caught and reported
+     * Database errors properly handled
+     * User-friendly error messages
+     * Transaction rollback on errors
+   
+   - Security:
+     * SQL injection prevention
+     * Data validation
+     * Proper error handling
+     * Transaction management
+   
+   - User Experience:
+     * Clear error messages
+     * Proper loading states
+     * Immediate feedback
+     * Consistent response format
+
 # Faculty Evaluation System - Issue Tracking
 
 ## Issue: Text Field Comments Not Being Saved
@@ -523,4 +566,99 @@ Required Changes:
 - Issue was primarily in the ajax.php file where evaluation answers were being inserted
 - The fix ensures proper handling of both question types while maintaining data integrity
 - Added error reporting to help identify any future issues
+
+# File Connections and Dependencies
+
+## Bulk Account Upload System
+### Connected Files:
+1. ajax.php
+   - Contains AJAX handlers for bulk uploads:
+     - `import_students_csv`: Handles student CSV upload requests
+     - `import_faculty_csv`: Handles faculty CSV upload requests
+   - These handlers pass the uploaded files to admin_class.php functions
+
+2. admin_class.php
+   - Contains the actual processing functions:
+     - `import_students_csv($file)`: Processes student CSV data
+     - `import_faculty_csv($file)`: Processes faculty CSV data
+   - Handles all validation, database operations, and error handling
+
+### Frontend Integration:
+1. admin/new_student.php
+   - Contains the bulk upload form and modal for students
+   - Makes AJAX calls to ajax.php?action=import_students_csv
+
+2. admin/new_faculty.php
+   - Contains the bulk upload form and modal for faculty
+   - Makes AJAX calls to ajax.php?action=import_faculty_csv
+
+### Important Notes:
+- When modifying bulk upload functionality, always check both ajax.php and admin_class.php
+- The AJAX handlers in ajax.php should remain simple, delegating actual processing to admin_class.php
+- Any changes to validation or processing logic should be made in admin_class.php
+- Frontend files handle the UI and make AJAX calls, but don't contain processing logic
+
+TROUBLESHOOTING NOTES:
+-------------------
+If you encounter issues after:
+1. Truncating the database
+2. Adding a new academic year
+3. Setting system default to "yes"
+4. Updating evaluation status to "starting"
+
+Solution:
+- Log out of the system
+- Log back in
+- This will refresh your session and properly initialize the new academic year settings
+
+This is particularly important when:
+- Bulk importing students/faculty
+- Managing class assignments
+- Accessing evaluation forms
+- Viewing academic year settings
+
+## Starter Data Instructions
+1. Purpose:
+   - Populates essential tables in the correct order
+   - Ensures system has required data for basic functionality
+   - Prevents "Invalid Class ID" errors during bulk imports
+
+2. Tables Populated (in order):
+   - academic_list (Current and previous academic years)
+   - class_list (BSIT program classes)
+   - subject_list (Core IT subjects)
+
+3. How to Use:
+   a. Access the starter data page:
+      - Go to admin panel
+      - Click "Insert Starter Data" button
+      - Confirm the action when prompted
+
+   b. What happens:
+      - Data is inserted in the correct sequence
+      - Transaction ensures all-or-nothing insertion
+      - Feedback shows number of rows inserted per table
+
+4. When to Use:
+   - After database truncation
+   - When setting up a new instance
+   - When encountering "Invalid Class ID" errors
+   - Before bulk importing students/faculty
+
+5. Important Notes:
+   - Always run this before bulk imports
+   - Ensures class_list has valid IDs for student imports
+   - Maintains data integrity with proper foreign keys
+   - Provides basic academic structure
+
+[2024-03-21] Debug Box Implementation
+- Added debug boxes to track user management operations
+- Debug boxes will show:
+  * Form submission data
+  * AJAX request/response
+  * Database operations
+  * Error messages
+  * Success confirmations
+- Debug boxes will be visible in the UI for better troubleshooting
+- Replaced XAMPP error logging with visual debug feedback
    

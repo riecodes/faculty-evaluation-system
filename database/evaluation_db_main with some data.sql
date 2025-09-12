@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 26, 2025 at 03:06 AM
+-- Generation Time: Sep 12, 2025 at 02:38 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -40,9 +40,10 @@ CREATE TABLE `academic_list` (
 --
 
 INSERT INTO `academic_list` (`id`, `year`, `semester`, `is_default`, `status`) VALUES
-(1, '2019-2020', 1, 0, 0),
-(2, '2019-2020', 2, 0, 0),
-(3, '2020-2021', 1, 1, 1);
+(1, '2024-2025', 1, 1, 1),
+(2, '2024-2025', 2, 0, 0),
+(3, '2023-2024', 2, 0, 2),
+(4, '2023-2024', 1, 0, 2);
 
 -- --------------------------------------------------------
 
@@ -64,7 +65,13 @@ CREATE TABLE `class_list` (
 INSERT INTO `class_list` (`id`, `curriculum`, `level`, `section`) VALUES
 (1, 'BSIT', '1', 'A'),
 (2, 'BSIT', '1', 'B'),
-(3, 'BSIT', '1', 'C');
+(3, 'BSIT', '1', 'C'),
+(4, 'BSIT', '2', 'A'),
+(5, 'BSIT', '2', 'B'),
+(6, 'BSIT', '3', 'A'),
+(7, 'BSIT', '3', 'B'),
+(8, 'BSIT', '4', 'A'),
+(9, 'BSIT', '4', 'B');
 
 -- --------------------------------------------------------
 
@@ -84,8 +91,8 @@ CREATE TABLE `criteria_list` (
 --
 
 INSERT INTO `criteria_list` (`id`, `criteria`, `order_by`, `type`) VALUES
-(7, 'text again edited 1', 1, 'textfield'),
-(8, 'a real checklist', 0, 'checklist');
+(1, 'This is a checklists', 0, 'checklist'),
+(2, 'This is a Comments', 1, 'textfield');
 
 -- --------------------------------------------------------
 
@@ -105,14 +112,10 @@ CREATE TABLE `evaluation_answers` (
 --
 
 INSERT INTO `evaluation_answers` (`evaluation_id`, `question_id`, `rate`, `comment`) VALUES
-(4, 11, 1, NULL),
-(4, 12, 1, NULL),
-(4, 13, 1, NULL),
-(4, 10, 0, NULL),
-(5, 11, 1, NULL),
-(5, 12, 2, NULL),
-(5, 13, 3, NULL),
-(5, 10, 0, NULL);
+(1, 1, 1, NULL),
+(1, 2, 0, 'I LOVE YOU'),
+(2, 1, 2, NULL),
+(2, 2, 0, 'aaaaaa');
 
 -- --------------------------------------------------------
 
@@ -136,7 +139,8 @@ CREATE TABLE `evaluation_list` (
 --
 
 INSERT INTO `evaluation_list` (`evaluation_id`, `academic_id`, `class_id`, `student_id`, `subject_id`, `faculty_id`, `restriction_id`, `date_taken`) VALUES
-(5, 3, 1, 6, 1, 1, 42, '2025-05-26 09:03:28');
+(1, 1, 1, 1, 1, 2, 1, '2025-09-12 14:11:18'),
+(2, 1, 1, 2, 1, 2, 1, '2025-09-12 14:55:55');
 
 -- --------------------------------------------------------
 
@@ -161,9 +165,25 @@ CREATE TABLE `faculty_list` (
 --
 
 INSERT INTO `faculty_list` (`id`, `school_id`, `firstname`, `lastname`, `email`, `password`, `avatar`, `date_created`, `status`) VALUES
-(1, '20140623', 'lance', 'ancheta', 'lance@faculty.com', '2db95e8e1a9267b7a1188556b2013b33', '1608011100_avatar.jpg', '2020-12-15 13:45:18', 1),
-(2, 'F2023001', 'Albert', 'Einstein', 'albert.einstein@example.com', '2c00898447b1c0c305d32cdc6e4b8b06', 'no-image-available.png', '2025-05-25 18:32:43', 1),
-(3, 'F2023002', 'Marie', 'Curie', 'marie.curie@example.com', 'b8efc6eb59e6376dff19b3944b543dd6', 'no-image-available.png', '2025-05-25 18:32:43', 1);
+(1, 'F2023001', 'John', 'Doe', 'john@faculty.com', '363b122c528f54df4a0446b6bab05515', 'no-image-available.png', '2025-05-26 22:50:16', 1),
+(2, 'F2023002', 'Jane', 'Smith', 'jane@faculty.com', '363b122c528f54df4a0446b6bab05515', 'no-image-available.png', '2025-05-26 22:50:16', 1),
+(3, 'F2023003', 'Robert', 'Johnson', 'robert@faculty.com', '4b43b0aee35624cd95b910189b3dc231', 'no-image-available.png', '2025-05-26 22:50:16', 1);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `irregular_enrollments`
+--
+
+CREATE TABLE `irregular_enrollments` (
+  `id` int(30) NOT NULL,
+  `student_id` int(30) NOT NULL,
+  `subject_id` int(30) NOT NULL,
+  `class_id` int(30) NOT NULL,
+  `faculty_id` int(30) NOT NULL,
+  `academic_id` int(30) NOT NULL,
+  `restriction_id` int(30) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -185,10 +205,8 @@ CREATE TABLE `question_list` (
 --
 
 INSERT INTO `question_list` (`id`, `academic_id`, `question`, `order_by`, `criteria_id`, `type`) VALUES
-(10, 3, 'this should be textfield', 0, 7, 'textfield'),
-(11, 3, 'presentation', 0, 8, 'checklist'),
-(12, 3, 'vocabulary', 1, 8, 'checklist'),
-(13, 3, 'kapogian', 2, 8, 'checklist');
+(1, 1, 'test', 0, 1, 'checklist'),
+(2, 1, 'ttest', 1, 2, 'textfield');
 
 -- --------------------------------------------------------
 
@@ -211,9 +229,7 @@ CREATE TABLE `restriction_list` (
 --
 
 INSERT INTO `restriction_list` (`id`, `academic_id`, `faculty_id`, `class_id`, `subject_id`, `type`, `student_id`) VALUES
-(36, 3, 1, 1, 1, 'regular', NULL),
-(41, 3, 1, 3, 1, 'regular', NULL),
-(42, 3, 1, 1, 1, 'irregular', NULL);
+(1, 1, 2, 1, 1, 'regular', NULL);
 
 -- --------------------------------------------------------
 
@@ -228,7 +244,7 @@ CREATE TABLE `student_list` (
   `lastname` varchar(200) NOT NULL,
   `email` varchar(200) NOT NULL,
   `password` text NOT NULL,
-  `class_id` int(30) NOT NULL,
+  `class_id` int(30) DEFAULT NULL,
   `type` enum('regular','irregular') NOT NULL DEFAULT 'regular',
   `avatar` text NOT NULL DEFAULT 'no-image-available.png',
   `date_created` datetime NOT NULL DEFAULT current_timestamp(),
@@ -240,11 +256,10 @@ CREATE TABLE `student_list` (
 --
 
 INSERT INTO `student_list` (`id`, `school_id`, `firstname`, `lastname`, `email`, `password`, `class_id`, `type`, `avatar`, `date_created`, `status`) VALUES
-(4, '124125', 'eirmon', 'paculan', 'eirmonpaculan11@gmail.com', 'e1671797c52e15f763380b45e841ec32', 1, 'regular', '1748143020_VideoCapture_20250422-125624.jpg', '2025-04-30 18:09:37', 1),
-(5, '1351', 'jervic', 'manalo', 'jervic@student.com', '363b122c528f54df4a0446b6bab05515', 2, 'regular', 'no-image-available.png', '2025-04-30 18:09:54', 1),
-(6, '15315', 'john', 'grancioso', 'john@student.com', '363b122c528f54df4a0446b6bab05515', 1, 'irregular', 'no-image-available.png', '2025-04-30 18:10:14', 1),
-(7, '20230001', 'John', 'Doe', 'johndoe@example.com', '42f749ade7f9e195bf475f37a44cafcb', 1, 'regular', 'no-image-available.png', '2025-05-25 18:37:52', 1),
-(8, '20230002', 'Jane', 'Smith', 'janesmith@example.com', 'b24ecc40cef177b0334c4cfa91f94d28', 2, 'regular', 'no-image-available.png', '2025-05-25 18:37:52', 1);
+(1, 'S2023001', 'Alice', 'Brown', 'alice@student.com', '0cc175b9c0f1b6a831c399e269772661', 1, 'regular', 'no-image-available.png', '2025-05-26 22:49:36', 1),
+(2, 'S2023002', 'Michael', 'Wilson', 'michael@student.com', '6f8f57715090da2632453988d9a1501b', 1, 'regular', 'no-image-available.png', '2025-05-26 22:49:36', 1),
+(3, 'S2023003', 'Sarah', 'David', 'sarah@student.com', '03c7c0ace395d80182db07ae2c30f034', NULL, 'irregular', 'no-image-available.png', '2025-05-26 22:49:36', 1),
+(4, '1513', 'jervic', 'manalo', 'eirmonpaculan11@gmail.com', '363b122c528f54df4a0446b6bab05515', 0, 'irregular', 'no-image-available.png', '2025-05-26 23:08:53', 1);
 
 -- --------------------------------------------------------
 
@@ -264,9 +279,27 @@ CREATE TABLE `subject_list` (
 --
 
 INSERT INTO `subject_list` (`id`, `code`, `subject`, `description`) VALUES
-(1, '101', 'DCIT21', 'Computer Basics'),
-(2, 'ENG-101', 'English', 'English'),
-(3, 'M-101', 'Math 101', 'Math - Advance Algebra ');
+(1, 'IT101', 'Introduction to Computing', 'Basic concepts of computing and information technology'),
+(2, 'IT102', 'Computer Programming 1', 'Introduction to programming concepts and basic algorithms'),
+(3, 'IT103', 'Computer Programming 2', 'Object-oriented programming and data structures'),
+(4, 'IT104', 'Web Development 1', 'HTML, CSS, and basic web development concepts'),
+(5, 'IT105', 'Database Management Systems', 'Introduction to database concepts and SQL'),
+(6, 'IT201', 'Data Structures and Algorithms', 'Advanced data structures and algorithm analysis'),
+(7, 'IT202', 'Web Development 2', 'Advanced web development and JavaScript frameworks'),
+(8, 'IT203', 'Systems Analysis and Design', 'Software development lifecycle and methodologies'),
+(9, 'IT204', 'Networking 1', 'Computer networks and communication protocols'),
+(10, 'IT205', 'Operating Systems', 'Operating system concepts and management'),
+(11, 'IT301', 'Software Engineering', 'Software development methodologies and practices'),
+(12, 'IT302', 'Mobile Application Development', 'Mobile app development for Android and iOS'),
+(13, 'IT303', 'Information Security', 'Cybersecurity principles and practices'),
+(14, 'IT304', 'Cloud Computing', 'Cloud services and deployment models'),
+(15, 'IT305', 'Artificial Intelligence', 'AI concepts and machine learning basics'),
+(16, 'IT401', 'IT Project Management', 'Project planning, execution, and management'),
+(17, 'IT402', 'IT Capstone Project', 'Final year project development'),
+(18, 'IT403', 'IT Internship', 'Industry immersion and practical experience'),
+(19, 'IT404', 'IT Research Methods', 'Research methodologies in IT'),
+(20, 'IT405', 'IT Ethics and Professional Practice', 'Professional ethics and industry standards'),
+(21, 'IT406', 'Advanced Database Systems', 'Advanced database concepts, optimization, and distributed databases');
 
 -- --------------------------------------------------------
 
@@ -288,7 +321,7 @@ CREATE TABLE `system_settings` (
 --
 
 INSERT INTO `system_settings` (`id`, `name`, `email`, `contact`, `address`, `cover_img`) VALUES
-(1, 'Faculty Evaluation System', 'info@sample.comm', '+6948 8542 623', '2102  Caldwell Road, Rochester, New York, 14608', '');
+(1, 'Faculty Evaluation Performance System', 'noreply@panpacific.com', '(+63)09735366442', 'MacArthur Hwy, Urdaneta, Pangasinan', '');
 
 -- --------------------------------------------------------
 
@@ -339,6 +372,7 @@ ALTER TABLE `criteria_list`
 -- Indexes for table `evaluation_answers`
 --
 ALTER TABLE `evaluation_answers`
+  ADD PRIMARY KEY (`evaluation_id`,`question_id`),
   ADD KEY `fk_answer_question` (`question_id`);
 
 --
@@ -352,6 +386,18 @@ ALTER TABLE `evaluation_list`
 --
 ALTER TABLE `faculty_list`
   ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `irregular_enrollments`
+--
+ALTER TABLE `irregular_enrollments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `subject_id` (`subject_id`),
+  ADD KEY `class_id` (`class_id`),
+  ADD KEY `faculty_id` (`faculty_id`),
+  ADD KEY `idx_enrollment_student` (`student_id`),
+  ADD KEY `idx_enrollment_academic` (`academic_id`),
+  ADD KEY `idx_enrollment_restriction` (`restriction_id`);
 
 --
 -- Indexes for table `question_list`
@@ -401,25 +447,25 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `academic_list`
 --
 ALTER TABLE `academic_list`
-  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `class_list`
 --
 ALTER TABLE `class_list`
-  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `criteria_list`
 --
 ALTER TABLE `criteria_list`
-  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `evaluation_list`
 --
 ALTER TABLE `evaluation_list`
-  MODIFY `evaluation_id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `evaluation_id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `faculty_list`
@@ -428,28 +474,34 @@ ALTER TABLE `faculty_list`
   MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
+-- AUTO_INCREMENT for table `irregular_enrollments`
+--
+ALTER TABLE `irregular_enrollments`
+  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `question_list`
 --
 ALTER TABLE `question_list`
-  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `restriction_list`
 --
 ALTER TABLE `restriction_list`
-  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
+  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `student_list`
 --
 ALTER TABLE `student_list`
-  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `subject_list`
 --
 ALTER TABLE `subject_list`
-  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(30) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- AUTO_INCREMENT for table `system_settings`
@@ -471,7 +523,19 @@ ALTER TABLE `users`
 -- Constraints for table `evaluation_answers`
 --
 ALTER TABLE `evaluation_answers`
-  ADD CONSTRAINT `fk_answer_question` FOREIGN KEY (`question_id`) REFERENCES `question_list` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `fk_answer_question` FOREIGN KEY (`question_id`) REFERENCES `question_list` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_evaluation_answers_evaluation_list` FOREIGN KEY (`evaluation_id`) REFERENCES `evaluation_list` (`evaluation_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `irregular_enrollments`
+--
+ALTER TABLE `irregular_enrollments`
+  ADD CONSTRAINT `irregular_enrollments_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `student_list` (`id`),
+  ADD CONSTRAINT `irregular_enrollments_ibfk_2` FOREIGN KEY (`subject_id`) REFERENCES `subject_list` (`id`),
+  ADD CONSTRAINT `irregular_enrollments_ibfk_3` FOREIGN KEY (`class_id`) REFERENCES `class_list` (`id`),
+  ADD CONSTRAINT `irregular_enrollments_ibfk_4` FOREIGN KEY (`faculty_id`) REFERENCES `faculty_list` (`id`),
+  ADD CONSTRAINT `irregular_enrollments_ibfk_5` FOREIGN KEY (`academic_id`) REFERENCES `academic_list` (`id`),
+  ADD CONSTRAINT `irregular_enrollments_ibfk_6` FOREIGN KEY (`restriction_id`) REFERENCES `restriction_list` (`id`);
 
 --
 -- Constraints for table `question_list`

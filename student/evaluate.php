@@ -21,11 +21,22 @@ if (isset($_GET['cid']))
 
 // Get restrictions based on student type
 if ($is_irregular) {
-    // For irregular students, get all active faculty
-    $faculty_list = $conn->query("SELECT id, avatar, concat(firstname,' ',lastname) as faculty 
-        FROM faculty_list 
-        WHERE status = 1 
-        ORDER BY lastname, firstname");
+    // For irregular students, get their enrollments
+    $restriction = $conn->query("SELECT r.id, s.id as sid, f.id as fid, f.avatar, 
+        concat(f.firstname,' ',f.lastname) as faculty, s.code, s.subject, r.type,
+        concat(c.curriculum,' ',c.level,' - ',c.section) as class
+        FROM irregular_enrollments e
+        INNER JOIN restriction_list r ON r.id = e.restriction_id
+        INNER JOIN faculty_list f ON f.id = e.faculty_id 
+        INNER JOIN subject_list s ON s.id = e.subject_id 
+        INNER JOIN class_list c ON c.id = e.class_id
+        WHERE e.academic_id = {$_SESSION['academic']['id']} 
+        AND e.student_id = {$_SESSION['login_id']}
+        AND r.id not in (
+            SELECT restriction_id from evaluation_list 
+            where academic_id = {$_SESSION['academic']['id']} 
+            and student_id = {$_SESSION['login_id']} 
+        )");
 } else {
     // For regular students, get restrictions as before
     $restriction = $conn->query("SELECT r.id, s.id as sid, f.id as fid, f.avatar, 
@@ -35,12 +46,12 @@ if ($is_irregular) {
         inner join faculty_list f on f.id = r.faculty_id 
         inner join subject_list s on s.id = r.subject_id 
         inner join class_list c on c.id = r.class_id
-        where academic_id ={$_SESSION['academic']['id']} 
+        where academic_id = {$_SESSION['academic']['id']} 
         and class_id = {$_SESSION['login_class_id']} 
         and r.type = 'regular'
         and r.id not in (
             SELECT restriction_id from evaluation_list 
-            where academic_id ={$_SESSION['academic']['id']} 
+            where academic_id = {$_SESSION['academic']['id']} 
             and student_id = {$_SESSION['login_id']} 
         )");
 }
@@ -97,7 +108,13 @@ if ($is_irregular) {
                                     <label for="faculty">Faculty</label>
                                     <select class="form-control select2" id="faculty" name="faculty_id" required>
                                         <option value="">Select Faculty</option>
-                                        <?php while($row = $faculty_list->fetch_assoc()): ?>
+                                        <?php 
+                                        $faculty_list = $conn->query("SELECT f.id, CONCAT(f.firstname, ' ', f.lastname) as faculty 
+                                            FROM faculty_list f 
+                                            WHERE f.status = 1 
+                                            ORDER BY f.lastname, f.firstname");
+                                        while($row = $faculty_list->fetch_assoc()): 
+                                        ?>
                                             <option value="<?php echo $row['id'] ?>" <?php echo $faculty_id == $row['id'] ? 'selected' : '' ?>>
                                                 <?php echo ucwords($row['faculty']) ?>
                                             </option>
@@ -167,7 +184,7 @@ if ($is_irregular) {
 						<?php echo $_SESSION['academic']['year'] . ' ' . (ordinal_suffix($_SESSION['academic']['semester'])) ?>
 					</b>
 					<div class="card-tools">
-						<button class="btn btn-sm btn-primary mx-1" form="manage-evaluation">Submit
+						<button class="btn btn-sm btn-primary mx-1" form="manage-evaluation" id="submit-evaluation" <?php echo $is_irregular ? 'disabled' : '' ?>>Submit
 							Evaluation</button>
 					</div>
 				</div>
@@ -350,7 +367,7 @@ if ($is_irregular) {
 							return;
 						}
 						
-						var options = '<option value="">Select Subject</option>';
+							var options = '<option value="">Select Subject</option>';
 						if(data && data.length > 0) {
 							data.forEach(function(item) {
 								options += '<option value="' + item.id + '">' + item.code + ' - ' + item.subject + '</option>';
@@ -421,7 +438,7 @@ if ($is_irregular) {
 							return;
 						}
 						
-						var options = '<option value="">Select Section</option>';
+							var options = '<option value="">Select Section</option>';
 						if(data && data.length > 0) {
 							data.forEach(function(item) {
 								options += '<option value="' + item.id + '">' + item.class + '</option>';
@@ -507,6 +524,9 @@ if ($is_irregular) {
 				$('#faculty, #subject, #class').prop('disabled', true);
 				$('#proceed-btn').prop('disabled', true);
 				
+				// Enable submit evaluation button
+				$('#submit-evaluation').prop('disabled', false);
+				
 				// Show success message
 				$('#selection-error')
 					.removeClass('alert-danger')
@@ -556,7 +576,7 @@ if ($is_irregular) {
 			$('#debug-box .card-header').removeClass('bg-danger').addClass('bg-dark');
 		}
 	}
-
+	
 	$('#manage-evaluation').submit(function(e) {
 		e.preventDefault();
 		start_load();

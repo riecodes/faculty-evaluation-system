@@ -1,3 +1,4 @@
-school_id,firstname,lastname,class_id,email,password,status
-20230001,John,Doe,1,johndoe@example.com,Password123,1
-20230002,Jane,Smith,2,janesmith@example.com,Password456,1 
+school_id,firstname,lastname,email,password,class_id,status
+S2023001,Alice,Brown,alice@student.com,a,,0
+S2023002,Michael,Wilson,michael@student.com,m,,0
+S2023003,Sarah,Davis,sarah@student.com,s,,1 

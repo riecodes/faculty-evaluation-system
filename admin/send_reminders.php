@@ -26,22 +26,58 @@ $pending_query = $conn->query("SELECT
     s.id as student_id,
     s.email,
     CONCAT(s.firstname, ' ', s.lastname) as student_name,
-    CONCAT(c.curriculum, ' ', c.level, '-', c.section) as class,
+    CASE 
+        WHEN s.type = 'regular' THEN CONCAT(c.curriculum, ' ', c.level, '-', c.section)
+        WHEN s.type = 'irregular' THEN (
+            SELECT GROUP_CONCAT(DISTINCT CONCAT(cl.curriculum, ' ', cl.level, '-', cl.section) SEPARATOR ', ')
+            FROM irregular_enrollments ie
+            JOIN class_list cl ON cl.id = ie.class_id
+            WHERE ie.student_id = s.id 
+            AND ie.academic_id = {$academic_id}
+            AND ie.faculty_id = f.id
+            AND ie.subject_id = sub.id
+        )
+    END as class,
     CONCAT(f.firstname, ' ', f.lastname) as faculty_name,
     sub.subject,
-    sub.code as subject_code
+    sub.code as subject_code,
+    s.type as student_type
 FROM student_list s
-INNER JOIN class_list c ON c.id = s.class_id
-INNER JOIN restriction_list r ON r.class_id = c.id
-INNER JOIN faculty_list f ON f.id = r.faculty_id
-INNER JOIN subject_list sub ON sub.id = r.subject_id
+LEFT JOIN class_list c ON c.id = s.class_id
+LEFT JOIN (
+    SELECT DISTINCT e.student_id, e.faculty_id, e.subject_id, e.class_id, e.academic_id, e.restriction_id
+    FROM irregular_enrollments e
+    WHERE e.academic_id = {$academic_id}
+) e ON e.student_id = s.id
+LEFT JOIN restriction_list r ON (
+    (s.type = 'regular' AND r.class_id = s.class_id AND r.type = 'regular') OR
+    (s.type = 'irregular' AND r.id = e.restriction_id AND r.type = 'irregular')
+)
+LEFT JOIN faculty_list f ON f.id = r.faculty_id
+LEFT JOIN subject_list sub ON sub.id = r.subject_id
 WHERE r.academic_id = {$academic_id}
 AND r.id NOT IN (
     SELECT restriction_id 
     FROM evaluation_list 
     WHERE academic_id = {$academic_id} 
     AND student_id = s.id
+)
+AND NOT EXISTS (
+    SELECT 1 FROM evaluation_list e
+    WHERE e.academic_id = {$academic_id}
+    AND e.student_id = s.id
+    AND e.faculty_id = f.id
+    AND e.subject_id = sub.id
 )");
+
+// Check if there are any pending evaluations
+$has_pending = $pending_query->num_rows > 0;
+
+// If no pending evaluations, redirect back with message
+if (!$has_pending) {
+    header("Location: ../index.php?page=report&status=error&message=" . urlencode("No pending evaluations to send reminders for."));
+    exit;
+}
 
 while($student = $pending_query->fetch_assoc()) {
     if(!empty($student['email'])) {
