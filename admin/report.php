@@ -119,6 +119,48 @@ function ordinal_suffix($num)
 	.comments-list li:last-child {
 		border-bottom: none;
 	}
+
+	/* Bar Graph Styles */
+	.bar-container {
+		position: relative;
+		width: 100%;
+		height: 25px;
+		background-color: #f8f9fa;
+		border: 1px solid #dee2e6;
+		border-radius: 3px;
+		overflow: visible;
+		min-width: 60px;
+	}
+
+	.bar-fill {
+		height: 100%;
+		transition: width 0.3s ease;
+		position: relative;
+	}
+
+	.bar-fill.rating-1 { background-color: #dc3545; } /* Red for Strongly Disagree */
+	.bar-fill.rating-2 { background-color: #fd7e14; } /* Orange for Disagree */
+	.bar-fill.rating-3 { background-color: #ffc107; } /* Yellow for Uncertain */
+	.bar-fill.rating-4 { background-color: #20c997; } /* Light Green for Agree */
+	.bar-fill.rating-5 { background-color: #28a745; } /* Green for Strongly Agree */
+
+	.bar-text {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		font-size: 11px;
+		font-weight: bold;
+		color: #ffffff;
+		text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+		z-index: 2;
+		white-space: nowrap;
+		pointer-events: none;
+	}
+
+	.bar-container:hover .bar-fill {
+		opacity: 0.8;
+	}
 </style>
 
 <div class="container-fluid px-4">
@@ -604,13 +646,20 @@ function ordinal_suffix($num)
 						$('.rates').text('-')
 						$('.comments-list').html('')
 
-						// Handle checklist ratings with 2 decimal places
+						// Handle checklist ratings with bar graphs
 						var data = resp.data
 						Object.keys(data).map(q => {
 							Object.keys(data[q]).map(r => {
 								var percentage = parseFloat(data[q][r]);
 								var formattedPercentage = percentage.toFixed(2) + '%';
-								$('.rate_' + r + '_' + q).text(formattedPercentage);
+								
+								// Create bar graph HTML
+								var barHtml = '<div class="bar-container">' +
+									'<div class="bar-fill rating-' + r + '" style="width: ' + percentage + '%"></div>' +
+									'<span class="bar-text">' + formattedPercentage + '</span>' +
+									'</div>';
+								
+								$('.rate_' + r + '_' + q).html(barHtml);
 							})
 						})
 

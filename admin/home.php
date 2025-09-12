@@ -55,10 +55,22 @@ $arrayStatus = array("Not Yet Started", "On-going", "Closed");
       <!-- Academic year and evaluation status information -->
       <div class="bg-primary text-white p-3 rounded">
         <h6 class="mb-1">
-          <b>Academic Year: <?php echo $_SESSION['academic']['year'] . ' ' . (ordinal_suffix1($_SESSION['academic']['semester'])) ?> Semester</b>
+          <b>Academic Year: <?php 
+            if (isset($_SESSION['academic']) && isset($_SESSION['academic']['year']) && isset($_SESSION['academic']['semester'])) {
+              echo $_SESSION['academic']['year'] . ' ' . (ordinal_suffix1($_SESSION['academic']['semester'])) . ' Semester';
+            } else {
+              echo 'Not Set';
+            }
+          ?></b>
         </h6>
         <small>
-          <b>Evaluation Status: <?php echo $arrayStatus[$_SESSION['academic']['status']] ?></b>
+          <b>Evaluation Status: <?php 
+            if (isset($_SESSION['academic']) && isset($_SESSION['academic']['status'])) {
+              echo $arrayStatus[$_SESSION['academic']['status']];
+            } else {
+              echo 'Not Set';
+            }
+          ?></b>
         </small>
       </div>
     </div>
